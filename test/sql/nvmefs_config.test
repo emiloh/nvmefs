@@ -1,4 +1,4 @@
-# name: test/functions/nvmefs_config.test
+# name: test/sql/nvmefs_config.test
 # description: test run nvmefs_config() twice
 # group: [nvmefs-config]
 
@@ -13,6 +13,6 @@ CALL nvmefs_config();
 query II
 CALL nvmefs_config();
 ----
-'nvme_device_path' ''
-'fdp_plhdls' '0'
-'temporary_directory' 'nvme:///tmp'
+nvme_device_path ''
+fdp_plhdls 0
+temporary_directory nvme:///tmp
