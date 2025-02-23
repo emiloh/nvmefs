@@ -129,12 +129,12 @@ static void AddConfig(DatabaseInstance &instance) {
 
 static void LoadInternal(DatabaseInstance &instance) {
 	// Register NvmeFileSystem
-	auto &fs = instance.GetFileSystem();
+	// auto &fs = instance.GetFileSystem();
 
-	fs.RegisterSubSystem(make_uniq<NvmeFileSystemProxy>());
+	// fs.RegisterSubSystem(make_uniq<NvmeFileSystemProxy>());
 
-	CreateNvmefsSecretFunctions::Register(instance);
-	AddConfig(instance);
+	// CreateNvmefsSecretFunctions::Register(instance);
+	// AddConfig(instance);
 
 	TableFunction nvmefs_hello_world_function("nvmefs_hello", {}, NvmefsHelloWorld, NvmefsHelloWorldBind);
 	ExtensionUtil::RegisterFunction(instance, nvmefs_hello_world_function);
