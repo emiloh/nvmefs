@@ -1,0 +1,18 @@
+# name: test/functions/nvmefs_config.test
+# description: test run nvmefs_config() twice
+# group: [nvmefs-config]
+
+# Require the extension to be loaded
+require nvmefs
+
+# Run the config function twice time
+warmup_run
+CALL nvmefs_config();
+
+# Last run with check
+query
+CALL nvmefs_config();
+----
+'nvme_device_path' ''
+'fdp_plhdls' '0'
+'temporary_directory' 'nvme:///tmp'
