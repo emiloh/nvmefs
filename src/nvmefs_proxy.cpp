@@ -7,15 +7,16 @@ namespace duckdb {
 const char MAGIC_BYTES[] = "NVMEFS";
 
 NvmeFileSystemProxy::NvmeFileSystemProxy() : fs(make_uniq<NvmeFileSystem>(*this)) {
-	metadata = LoadMetadata();
+	// metadata = LoadMetadata();
 
-	// print for debug
-	std::cout << "this is metadata db - start: " << metadata.database.start << " end: " << metadata.database.end
-	          << " loc: " << metadata.database.location << std::endl;
-	std::cout << "this is metadata wal - start: " << metadata.write_ahead_log.start
-	          << " end: " << metadata.write_ahead_log.end << " loc: " << metadata.write_ahead_log.location << std::endl;
-	std::cout << "this is metadata temp - start: " << metadata.temporary.start << " end: " << metadata.temporary.end
-	          << " loc: " << metadata.temporary.location << std::endl;
+	// // print for debug
+	// std::cout << "this is metadata db - start: " << metadata.database.start << " end: " << metadata.database.end
+	//           << " loc: " << metadata.database.location << std::endl;
+	// std::cout << "this is metadata wal - start: " << metadata.write_ahead_log.start
+	//           << " end: " << metadata.write_ahead_log.end << " loc: " << metadata.write_ahead_log.location <<
+	//           std::endl;
+	// std::cout << "this is metadata temp - start: " << metadata.temporary.start << " end: " << metadata.temporary.end
+	//           << " loc: " << metadata.temporary.location << std::endl;
 }
 
 void NvmeFileSystemProxy::Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) {
