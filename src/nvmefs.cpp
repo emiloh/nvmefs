@@ -19,19 +19,19 @@ NvmeFileHandle::NvmeFileHandle(FileSystem &file_system, string path, uint8_t pli
 	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(device);
 	uint32_t nsid = xnvme_dev_get_nsid(device);
 
-	struct xnvme_spec_ruhs *ruhs = nullptr;
-	uint32_t ruhs_nbytes = sizeof(*ruhs) + FDP_PLID_COUNT + sizeof(struct xnvme_spec_ruhs_desc);
+	uint32_t ruhs_nbytes = sizeof(xnvme_spec_ruhs) + FDP_PLID_COUNT + sizeof(struct xnvme_spec_ruhs_desc);
 
-	ruhs = (struct xnvme_spec_ruhs *)xnvme_buf_alloc(device, ruhs_nbytes);
-	memset(ruhs, 0, ruhs_nbytes);
+	void *buf = xnvme_buf_alloc(device, ruhs_nbytes);
+	memset(buf, 0, ruhs_nbytes);
 
-	xnvme_nvm_mgmt_recv(&ctx, nsid, XNVME_SPEC_IO_MGMT_RECV_RUHS, 0, ruhs, ruhs_nbytes);
+	xnvme_nvm_mgmt_recv(&ctx, nsid, XNVME_SPEC_IO_MGMT_RECV_RUHS, 0, buf, ruhs_nbytes);
+	xnvme_spec_ruhs *ruhs = (struct xnvme_spec_ruhs *)buf;
 
 	uint16_t phid = ruhs->desc[plid_idx].pi;
 
 	this->placement_identifier = phid << 16;
 
-	xnvme_buf_free(device, ruhs);
+	xnvme_buf_free(device, buf);
 }
 
 NvmeFileHandle::~NvmeFileHandle() {
