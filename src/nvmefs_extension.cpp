@@ -104,7 +104,7 @@ static unique_ptr<FunctionData> ConfigPrintBind(ClientContext &ctx, TableFunctio
 	names.emplace_back("Value");
 	return_types.emplace_back(LogicalType::VARCHAR);
 
-	auto result = make_uniq<NvmeFsHelloFunctionData>();
+	auto result = make_uniq<ConfigPrintFunctionData>();
 	result->finished = false;
 
 	return std::move(result);
