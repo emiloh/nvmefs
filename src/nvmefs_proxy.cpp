@@ -42,21 +42,23 @@ GlobalMetadata NvmeFileSystemProxy::LoadMetadata() {
 	// else proceed ...
 	idx_t bytes_to_read = sizeof(MAGIC_BYTES) + sizeof(GlobalMetadata);
 	idx_t metadata_location = 0;
-	vector<uint8_t> buf(bytes_to_read);
+	uint8_t *buf = new uint8_t[bytes_to_read];
 	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ;
 
 	unique_ptr<FileHandle> fh = fs->OpenFile(NVME_GLOBAL_METADATA_PATH, flags);
 
-	fs->Read(*fh, buf.data(), bytes_to_read, metadata_location);
+	fs->Read(*fh, buf, bytes_to_read, metadata_location);
 
 	// Check magic bytes
-	if (memcmp(buf.data(), MAGIC_BYTES, sizeof(MAGIC_BYTES)) != 0) {
+	if (memcmp(buf, MAGIC_BYTES, sizeof(MAGIC_BYTES)) != 0) {
+		delete[] buf;
 		return InitializeMetadata();
 	}
 
 	GlobalMetadata global;
-	memcpy(&global, (buf.data() + sizeof(MAGIC_BYTES)), sizeof(GlobalMetadata));
+	memcpy(&global, (buf + sizeof(MAGIC_BYTES)), sizeof(GlobalMetadata));
 
+	delete[] buf;
 	return global;
 }
 
@@ -81,7 +83,7 @@ GlobalMetadata NvmeFileSystemProxy::InitializeMetadata() {
 	idx_t bytes_to_write = sizeof(MAGIC_BYTES) + sizeof(GlobalMetadata);
 	idx_t medata_location = 0;
 
-	vector<uint8_t> buf(bytes_to_write);
+	uint8_t *buf = new uint8_t[bytes_to_write];
 
 	Metadata meta_db {.start = 1, .end = 5001, .location = 1};
 	Metadata meta_wal {.start = 5002, .end = 10002, .location = 5002};
@@ -89,13 +91,15 @@ GlobalMetadata NvmeFileSystemProxy::InitializeMetadata() {
 
 	GlobalMetadata global {.database = meta_db, .write_ahead_log = meta_wal, .temporary = meta_temp};
 
-	memcpy(buf.data(), MAGIC_BYTES, sizeof(MAGIC_BYTES));
-	memcpy(buf.data() + sizeof(MAGIC_BYTES), &global, sizeof(GlobalMetadata));
+	memcpy(buf, MAGIC_BYTES, sizeof(MAGIC_BYTES));
+	memcpy(buf + sizeof(MAGIC_BYTES), &global, sizeof(GlobalMetadata));
 
 	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 
 	unique_ptr<FileHandle> fh = fs->OpenFile(NVME_GLOBAL_METADATA_PATH, flags);
-	fs->Write(*fh, buf.data(), bytes_to_write, medata_location);
+	fs->Write(*fh, buf, bytes_to_write, medata_location);
+
+	delete[] buf;
 
 	return global;
 }

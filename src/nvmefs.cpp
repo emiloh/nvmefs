@@ -59,7 +59,7 @@ unique_ptr<NvmeCmdContext> NvmeFileHandle::PrepareWriteCommand() {
 	nvme_ctx->namespace_id = nsid;
 	nvme_ctx->lba_size = geo->lba_nbytes;
 
-	return std::move(nvme_ctx);
+	return nvme_ctx;
 }
 
 unique_ptr<NvmeCmdContext> NvmeFileHandle::PrepareReadCommand() {
@@ -75,7 +75,7 @@ unique_ptr<NvmeCmdContext> NvmeFileHandle::PrepareReadCommand() {
 	nvme_ctx->namespace_id = nsid;
 	nvme_ctx->lba_size = geo->lba_nbytes;
 
-	return std::move(nvme_ctx);
+	return nvme_ctx;
 }
 
 /***************************
