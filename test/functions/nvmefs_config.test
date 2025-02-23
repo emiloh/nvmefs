@@ -6,11 +6,11 @@
 require nvmefs
 
 # Run the config function twice time
-warmup_run
+statement ok
 CALL nvmefs_config();
 
 # Last run with check
-query
+query II
 CALL nvmefs_config();
 ----
 'nvme_device_path' ''
