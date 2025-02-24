@@ -133,14 +133,22 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 	fs.RegisterSubSystem(make_uniq<NvmeFileSystemProxy>());
 
+	printf("NvmeFileSystemProxy registered\n");
+
 	CreateNvmefsSecretFunctions::Register(instance);
 	AddConfig(instance);
+
+	printf("NvmefsSecretFunctions registered\n");
 
 	TableFunction nvmefs_hello_world_function("nvmefs_hello", {}, NvmefsHelloWorld, NvmefsHelloWorldBind);
 	ExtensionUtil::RegisterFunction(instance, nvmefs_hello_world_function);
 
+	printf("NvmefsHelloWorld registered\n");
+
 	TableFunction config_print_function("print_config", {}, ConfigPrint, ConfigPrintBind);
 	ExtensionUtil::RegisterFunction(instance, config_print_function);
+
+	printf("ConfigPrint registered\n");
 }
 
 void NvmefsExtension::Load(DuckDB &db) {
