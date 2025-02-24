@@ -3,8 +3,6 @@
 #include "duckdb/common/string_util.hpp"
 
 #include <libxnvme.h>
-#include <linux/io_uring.h>
-#include <xnvme_be_registry.h>
 
 namespace duckdb {
 
