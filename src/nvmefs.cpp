@@ -95,6 +95,13 @@ unique_ptr<FileHandle> NvmeFileSystem::OpenFile(const string &path, FileOpenFlag
 
 	// Create NvmeFileHandler
 	auto xnvme_opts = xnvme_opts_default();
+	printf("xnvme_opts:\n");
+	printf("  be: %s\n", xnvme_opts.be);
+	printf("  mem: %s\n", xnvme_opts.mem);
+	printf("  sync: %s\n", xnvme_opts.sync);
+	printf("  async: %s\n", xnvme_opts.async);
+	printf("  admin: %s\n", xnvme_opts.admin);
+
 	xnvme_dev *device = xnvme_dev_open(device_path.c_str(), &xnvme_opts);
 
 	// If device is not opened then we should fail... for now return null
