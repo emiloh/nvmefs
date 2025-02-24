@@ -95,6 +95,7 @@ unique_ptr<FileHandle> NvmeFileSystem::OpenFile(const string &path, FileOpenFlag
 
 	// Create NvmeFileHandler
 	auto xnvme_opts = xnvme_opts_default();
+	xnvme_opts.be = "linux";
 	printf("xnvme_opts:\n");
 	printf("  be: %s\n", xnvme_opts.be);
 	printf("  mem: %s\n", xnvme_opts.mem);
