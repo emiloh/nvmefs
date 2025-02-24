@@ -7,7 +7,7 @@ namespace duckdb {
 const char MAGIC_BYTES[] = "NVMEFS";
 
 NvmeFileSystemProxy::NvmeFileSystemProxy() : fs(make_uniq<NvmeFileSystem>(*this)) {
-	// metadata = LoadMetadata();
+	metadata = LoadMetadata();
 
 	// print for debug
 	// std::cout << "this is metadata db - start: " << metadata.database.start << " end: " << metadata.database.end
@@ -51,10 +51,10 @@ GlobalMetadata NvmeFileSystemProxy::LoadMetadata() {
 	fs->Read(*fh, buf, bytes_to_read, metadata_location);
 
 	// Check magic bytes
-	if (memcmp(buf, MAGIC_BYTES, sizeof(MAGIC_BYTES)) != 0) {
-		delete[] buf;
-		return InitializeMetadata();
-	}
+	// if (memcmp(buf, MAGIC_BYTES, sizeof(MAGIC_BYTES)) != 0) {
+	// 	delete[] buf;
+	// 	return InitializeMetadata();
+	// }
 
 	GlobalMetadata global;
 	memcpy(&global, (buf + sizeof(MAGIC_BYTES)), sizeof(GlobalMetadata));
