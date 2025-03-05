@@ -13,14 +13,17 @@ namespace duckdb {
 struct NvmeCmdContext {
 	xnvme_cmd_ctx ctx;
 	uint32_t namespace_id;
-	uint64_t lba_size;
+	uint64_t number_of_lbas;
 };
+
+typedef void *nvme_buf_ptr;
 
 class NvmeFileHandle : public FileHandle {
 	friend class NvmeFileSystem;
 
 public:
-	NvmeFileHandle(FileSystem &file_system, string path, uint8_t plid_idx, xnvme_dev *device, uint8_t plid_count);
+	NvmeFileHandle(FileSystem &file_system, string path, uint8_t plid_idx, xnvme_dev *device, uint8_t plid_count,
+	               FileOpenFlags flags);
 	~NvmeFileHandle() override;
 
 	void Read(void *buffer, idx_t nr_bytes, idx_t location);
@@ -28,8 +31,19 @@ public:
 	int64_t Read(void *buffer, idx_t nr_bytes);
 	int64_t Write(void *buffer, idx_t nr_bytes);
 
-	unique_ptr<NvmeCmdContext> PrepareWriteCommand();
-	unique_ptr<NvmeCmdContext> PrepareReadCommand();
+protected:
+	unique_ptr<NvmeCmdContext> PrepareWriteCommand(int64_t nr_bytes);
+	unique_ptr<NvmeCmdContext> PrepareReadCommand(int64_t nr_bytes);
+
+	/// @brief Allocates a device specific buffer. After the need for the created buffer is gone, it should be freed
+	/// using FreeDeviceBuffer
+	/// @param nr_bytes The number of bytes to allocate (The actual allocation might be larger)
+	/// @return A pointer to the allocated buffer
+	nvme_buf_ptr AllocateDeviceBuffer(int64_t nr_bytes);
+
+	/// @brief Frees a device specific buffer
+	/// @param buffer The buffer to free
+	void FreeDeviceBuffer(nvme_buf_ptr buffer);
 
 	void Close() {
 	}
