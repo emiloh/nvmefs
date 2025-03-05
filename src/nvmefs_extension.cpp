@@ -56,6 +56,72 @@ static unique_ptr<FunctionData> ConfigPrintBind(ClientContext &ctx, TableFunctio
 	return std::move(result);
 }
 
+struct DeviceListFileStatsFunctionData : public TableFunctionData {
+	DeviceListFileStatsFunctionData() {
+	}
+	bool finished = false;
+};
+
+static void DeviceListFileStats(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
+	auto &data = data_p.bind_data->CastNoConst<DeviceListFileStatsFunctionData>();
+
+	if (data.finished) {
+		return;
+	}
+
+	// Get the filesystem... NOTE: This is a hack, not a good way to get the filesystem with loaded metadata
+	auto file_handle = context.db->GetFileSystem().OpenFile("nvmefs:///tmp", FileFlags::FILE_FLAGS_READ);
+
+	// Get a vector of metadata
+	GlobalMetadata metadata = file_handle->file_system.Cast<NvmeFileSystemProxy>().GetMetadata();
+
+	// Output as table in the datachunk
+	idx_t chunk_count = 0;
+
+	output.SetValue(0, chunk_count, Value("Database"));
+	output.SetValue(1, chunk_count, Value::UBIGINT(metadata.database.start));
+	output.SetValue(2, chunk_count, Value::UBIGINT(metadata.database.end));
+	output.SetValue(3, chunk_count, Value::UBIGINT(metadata.database.location));
+
+	chunk_count++;
+
+	output.SetValue(0, chunk_count, Value("write_ahead_log"));
+	output.SetValue(1, chunk_count, Value::UBIGINT(metadata.write_ahead_log.start));
+	output.SetValue(2, chunk_count, Value::UBIGINT(metadata.write_ahead_log.end));
+	output.SetValue(3, chunk_count, Value::UBIGINT(metadata.write_ahead_log.location));
+
+	chunk_count++;
+
+	output.SetValue(0, chunk_count, Value("temporary"));
+	output.SetValue(1, chunk_count, Value::UBIGINT(metadata.temporary.start));
+	output.SetValue(2, chunk_count, Value::UBIGINT(metadata.temporary.end));
+	output.SetValue(3, chunk_count, Value::UBIGINT(metadata.temporary.location));
+
+	chunk_count++;
+
+	data.finished = true;
+}
+
+static unique_ptr<FunctionData> DeviceListFileStatsBind(ClientContext &ctx, TableFunctionBindInput &input,
+                                                        vector<LogicalType> &return_types, vector<string> &names) {
+	names.emplace_back("name");
+	return_types.emplace_back(LogicalType::VARCHAR);
+
+	names.emplace_back("start_lba");
+	return_types.emplace_back(LogicalType::BIGINT);
+
+	names.emplace_back("end_lba");
+	return_types.emplace_back(LogicalType::BIGINT);
+
+	names.emplace_back("current_location");
+	return_types.emplace_back(LogicalType::BIGINT);
+
+	auto result = make_uniq<DeviceListFileStatsFunctionData>();
+	result->finished = false;
+
+	return std::move(result);
+}
+
 static void AddConfig(DatabaseInstance &instance) {
 
 	DBConfig &config = DBConfig::GetConfig(instance);
@@ -89,6 +155,9 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 	TableFunction config_print_function("print_config", {}, ConfigPrint, ConfigPrintBind);
 	ExtensionUtil::RegisterFunction(instance, config_print_function);
+
+	TableFunction show_device_status_function("dev_ls", {}, DeviceListFileStats, DeviceListFileStatsBind);
+	ExtensionUtil::RegisterFunction(instance, show_device_status_function);
 }
 
 void NvmefsExtension::Load(DuckDB &db) {

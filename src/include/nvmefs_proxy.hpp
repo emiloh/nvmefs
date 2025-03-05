@@ -48,6 +48,9 @@ public:
 		return "NvmeFileSystemProxy";
 	}
 
+	GlobalMetadata GetMetadata() {
+		return *metadata;
+	}
 
 private:
 	unique_ptr<GlobalMetadata> LoadMetadata(optional_ptr<FileOpener> opener);
