@@ -1,0 +1,24 @@
+# name: test/sql/filesystem/nvmefs_open_db_insert.test
+# description: tests that the filesystem can open a new database write to it (TODO: This is a horrible test... later the metadata will change based on the size of the device)
+# group: [nvmefs]
+
+# Load the required extension
+require nvmefs
+
+# Attach to the database
+statement ok 
+ATTACH 'nvmefs://test.db' AS nvme (ACCESS_MODE READ_WRITE, TYPE DUCKDB);
+
+# Create a new table
+statement ok
+CREATE TABLE nvme.test (i INTEGER, j INTEGER);
+
+# Insert data
+statement ok
+INSERT INTO nvme.test VALUES (42, 84);
+
+# Query all data in the table
+query II
+SELECT * FROM nvme.test;
+----
+42	84
