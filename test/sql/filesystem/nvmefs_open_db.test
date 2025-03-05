@@ -1,0 +1,16 @@
+# name: test/sql/filesystem/nvmefs_open_db.test
+# description: tests that the filesystem can open a new database (TODO: This is a horrible test... later the metadata will change based on the size of the device)
+# group: [nvmefs]
+
+# Load the required extension
+require nvmefs
+
+statement ok 
+ATTACH 'nvmefs://test.db' AS nvme (ACCESS_MODE READ_WRITE, TYPE DUCKDB);
+
+query IIII
+CALL dev_ls();
+----
+database 1 5001 1
+write_ahead_log 5002 10002 5002
+temporary 10003 15003 10003
