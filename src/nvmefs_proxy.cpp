@@ -209,7 +209,7 @@ unique_ptr<GlobalMetadata> NvmeFileSystemProxy::InitializeMetadata(optional_ptr<
 	global->write_ahead_log = meta_wal;
 
 	memcpy(buffer, MAGIC_BYTES, sizeof(MAGIC_BYTES));
-	memcpy(buffer + sizeof(MAGIC_BYTES), &global, sizeof(GlobalMetadata));
+	memcpy(buffer + sizeof(MAGIC_BYTES), global.get(), sizeof(GlobalMetadata));
 
 	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 
