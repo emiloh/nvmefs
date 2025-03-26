@@ -40,7 +40,7 @@ if __name__ == "__main__":
     con = duckdb.connect(config={"allow_unsigned_extensions": "true"})
 
     con.sql("PRAGMA platform;").show()
+    con.load_extension(extension_filepath)
     con.sql("from duckdb_extensions()").show()
 
-    # duckdb.load_extension(extension_filepath)
     # duckdb.connect("nvmefs:///test.db")
