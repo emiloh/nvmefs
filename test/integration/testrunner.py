@@ -37,6 +37,10 @@ class Arguments:
 if __name__ == "__main__":
     args = Arguments.parse_args()
     extension_filepath = os.path.join(args.extension_dir_path, "nvmefs.duckdb_extension")
+    con = duckdb.connect(config={"allow_unsigned_extensions": "true"})
 
-    duckdb.load_extension(extension_filepath)
-    duckdb.connect("nvmefs:///test.db")
+    con.sql("PRAGMA platform;").show()
+    con.sql("from duckdb_extensions()").show()
+
+    # duckdb.load_extension(extension_filepath)
+    # duckdb.connect("nvmefs:///test.db")
