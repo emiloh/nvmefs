@@ -18,3 +18,6 @@ dealloc-device:
 	@sh ./scripts/dealloc_device.sh
 
 clean-run: clean release run
+
+integration-test: release
+	@bash "./test/integration/run.sh" './build/release/extension/nvmefs'
