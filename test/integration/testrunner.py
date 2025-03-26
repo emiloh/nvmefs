@@ -16,15 +16,16 @@ class Arguments:
         parser = argparse.ArgumentParser()
 
         parser.add_argument(
-            "benchmark",
+            "-e",
+            "--extension_dir_path",
             type=str,
-            help="Name of the benchmark to run(tpch)",
-            default="tpch")
-
+            help="Path to the directory where the extension is located",
+            default="../../build/release/extension")
 
         args = parser.parse_args()
         
         arguments: Arguments = Arguments(
+            args.extension_dir_path
         )
 
         if not arguments.valid():
