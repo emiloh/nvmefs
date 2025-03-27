@@ -60,9 +60,13 @@ def extension_path(pytestconfig):
 def device_path(pytestconfig):
     return pytestconfig.getoption("device_path")
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def device(device_path):
-    return NvmeDevice(device_path)
+    device = NvmeDevice(device_path)
+
+    yield device
+
+    device.deallocate(1)
 
 if __name__ == "__main__":
     pytest.main()

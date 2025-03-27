@@ -1,4 +1,3 @@
-import pytest
 import duckdb
 
 def test_create_database_close_and_open(device, extension_path):
@@ -30,4 +29,3 @@ def test_create_database_close_and_open(device, extension_path):
     result = con.execute("SELECT * FROM numbers;").fetchall()
     assert result == [(1), (2), (3)]
     con.close()
-    device.deallocate(1)

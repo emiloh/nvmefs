@@ -20,7 +20,6 @@ def tpch_database_connection(device, extension_path):
 
     # Teardown the database and data
     con.close()
-    device.deallocate(1)
 
 def test_large_query_and_spilling_to_disk(tpch_database_connection):
     """
