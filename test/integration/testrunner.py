@@ -48,7 +48,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--device_path",
         type=str,
-        help="Path to the device to be used for the extension"
+        help="Path to the device to be used for the extension",
         default="/dev/ng1n1"
     )
 
