@@ -38,12 +38,6 @@ class Arguments:
         return arguments
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--extension_dir_path",
-        type=str,
-        default="../../build/release/extension/nvmefs",
-        help="Path to the directory where the extension is located"
-    )
 
     parser.addoption(
         "--device_path",
@@ -52,9 +46,6 @@ def pytest_addoption(parser):
         default="/dev/ng1n1"
     )
 
-@pytest.fixture(scope="session")
-def extension_path(pytestconfig):
-    return pytestconfig.getoption("extension_dir_path")
 
 @pytest.fixture(scope="session")
 def device_path(pytestconfig):
@@ -69,6 +60,9 @@ def device(device_path):
     device.deallocate(1)
 
 if __name__ == "__main__":
+    args = Arguments.parse_args()
+    duckdb.sql(f"INSTALL nvmefs FROM '{args.extension_dir_path}';") # Ensures that when we call "LOAD nvmefs" that it can be found in the extension directory
+
     pytest.main()
 
     # args = Arguments.parse_args()
