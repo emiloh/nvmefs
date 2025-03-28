@@ -15,5 +15,14 @@ init_environment() {
 }
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+ROOT_DIR="${SCRIPT_DIR}/../.."
+RELEASE_DIR="${ROOT_DIR}/build/release"
 
 init_environment $SCRIPT_DIR
+
+PLATFORM=$(cat "${RELEASE_DIR}/duckdb_platform_out" | head -n 1)
+NVMEFS_EXT_DIR="${RELEASE_DIR}/extension/nvmefs"
+PLATFORM_EXT_DIR="${NVMEFS_EXT_DIR}/v1.2.0/${PLATFORM}"
+
+mkdir -p "${PLATFORM_EXT_DIR}"
+ln -s "${NVMEFS_EXT_DIR}/nvmefs.duckdb_extension" "${PLATFORM_EXT_DIR}/nvmefs.duckdb_extension"
