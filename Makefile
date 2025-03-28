@@ -21,5 +21,5 @@ clean-run: clean release run
 
 integration-test: release
 	@bash "./test/integration/run.sh" './build/release/extension/nvmefs'
-	rm -rf ./build/release/extension/nvmefs/v1.2.0
-	rm "~/.duckdb/extensions/v1.2.0/$(cat build/release/duckdb_platform_out | head -n 1)/nvmefs.duckdb_extension"
+	@rm -rf ./build/release/extension/nvmefs/v1.2.0
+	@EXTENSION_PATH="$${HOME}/.duckdb/extensions/v1.2.0/$$(cat build/release/duckdb_platform_out)/nvmefs.*" && rm $$EXTENSION_PATH
