@@ -130,7 +130,8 @@ NvmeFileSystem::NvmeFileSystem(NvmeFileSystemProxy &proxy_ref) : proxy_filesyste
 	allocated_placement_identifiers["nvmefs:///tmp"] = 1;
 }
 
-NvmeFileSystem::NvmeFileSystem(NvmeFileSystemProxy &proxy_ref, const string &dev_path, const uint64_t placement_handls) : proxy_filesystem(proxy_ref), device_path(dev_path), plhdls(placement_handls) {
+NvmeFileSystem::NvmeFileSystem(NvmeFileSystemProxy &proxy_ref, const string &dev_path, const uint64_t placement_handls)
+    : proxy_filesystem(proxy_ref), device_path(dev_path), plhdls(placement_handls) {
 	allocated_paths.push_back("nvmefs:///tmp");
 	allocated_placement_identifiers["nvmefs:///tmp"] = 1;
 }
@@ -267,4 +268,19 @@ idx_t NvmeFileSystem::SeekPosition(FileHandle &handle) {
 	return handle.Cast<NvmeFileHandle>().GetFilePointer();
 }
 
+unique_ptr<NvmeDeviceGeometry> NvmeFileSystem::GetDeviceGeometry() {
+
+	xnvme_dev *device = xnvme_dev_open(device_path.c_str(), nullptr);
+
+	unique_ptr<NvmeDeviceGeometry> device_geo = make_uniq<NvmeDeviceGeometry>(NvmeDeviceGeometry {});
+	const xnvme_geo *geo = xnvme_dev_get_geo(device);
+	const xnvme_spec_idfy_ns *nsgeo = xnvme_dev_get_ns(device);
+
+	device_geo->lba_size = geo->lba_nbytes;
+	device_geo->lba_count = nsgeo->nsze;
+
+	xnvme_dev_close(device);
+
+	return move(device_geo);
+}
 } // namespace duckdb

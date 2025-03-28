@@ -16,6 +16,11 @@ struct NvmeCmdContext {
 	uint64_t number_of_lbas;
 };
 
+struct NvmeDeviceGeometry {
+	uint64_t lba_size;
+	uint64_t lba_count;
+};
+
 typedef void *nvme_buf_ptr;
 
 class NvmeFileHandle;
@@ -93,6 +98,7 @@ public:
 	}
 
 protected:
+	unique_ptr<NvmeDeviceGeometry> GetDeviceGeometry();
 	uint8_t GetPlacementIdentifierIndexOrDefault(const string &path);
 	uint64_t WriteInternal(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location_lba,
 	                       idx_t in_block_offset);

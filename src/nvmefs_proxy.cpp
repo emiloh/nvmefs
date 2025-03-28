@@ -31,12 +31,15 @@ void PrintFullMetadata(GlobalMetadata &metadata) {
 }
 #endif
 
+// TODO: Should this constructor be removed?
 NvmeFileSystemProxy::NvmeFileSystemProxy()
     : fs(make_uniq<NvmeFileSystem>(*this)), allocator(Allocator::DefaultAllocator()) {
 }
 
 NvmeFileSystemProxy::NvmeFileSystemProxy(NvmeConfig config)
-    : fs(make_uniq<NvmeFileSystem>(*this, config.device_path, config.plhdls)), allocator(Allocator::DefaultAllocator()), max_temp_size(config.max_temp_size), max_wal_size(config.max_wal_size) {
+    : fs(make_uniq<NvmeFileSystem>(*this, config.device_path, config.plhdls)), allocator(Allocator::DefaultAllocator()),
+      max_temp_size(config.max_temp_size), max_wal_size(config.max_wal_size) {
+	geometry = fs->GetDeviceGeometry();
 }
 
 unique_ptr<FileHandle> NvmeFileSystemProxy::OpenFile(const string &path, FileOpenFlags flags,
@@ -192,9 +195,16 @@ void NvmeFileSystemProxy::InitializeMetadata(FileHandle &handle, string path) {
 	// Example:
 	//  1 GB temp data -> x files -> map that supports x files total (this is the size)
 
-	Metadata meta_db {.start = 1, .end = 5001, .location = 1};
-	Metadata meta_wal {.start = 5002, .end = 10002, .location = 5002};
-	Metadata meta_temp {.start = 10003, .end = 15003, .location = 10003};
+	uint64_t temp_start = (geometry->lba_count - 1) - (max_temp_size / geometry->lba_size);
+
+	uint64_t wal_lba_count = max_wal_size / geometry->lba_size;
+	uint64_t wal_start = (temp_start - 1) - max_wal_size;
+
+	Metadata meta_temp {.start = temp_start, .end = geometry->lba_count - 1, .location = temp_start};
+	Metadata meta_wal {.start = wal_start, .end = temp_start - 1, .location = wal_start};
+	Metadata meta_db {.start = 1,
+	                  .end = wal_start - 1,
+	                  .location = 1}; // 1 is the first lba due to lba 0 being allocated for device metadata
 
 	unique_ptr<GlobalMetadata> global = make_uniq<GlobalMetadata>(GlobalMetadata {});
 
