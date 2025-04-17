@@ -54,7 +54,7 @@ idx_t NvmeDevice::Write(void *buffer, const CmdContext &context) {
 		// Read the whole LBA block
 		Read(dev_buffer, ctx);
 	}
-	memcpy(dev_buffer, buffer + ctx.offset, ctx.nr_bytes);
+	memcpy(dev_buffer, (char *)buffer + ctx.offset, ctx.nr_bytes);
 
 	uint32_t nsid = xnvme_dev_get_nsid(device);
 	uint8_t plid_idx = GetPlacementIdentifierOrDefault(ctx.filepath);
@@ -93,7 +93,7 @@ idx_t NvmeDevice::Read(void *buffer, const CmdContext &context) {
 		throw IOException("Encountered error when writing to NVMe device");
 	}
 
-	memcpy(buffer, dev_buffer + ctx.offset, ctx.nr_bytes);
+	memcpy(buffer, (char *)dev_buffer + ctx.offset, ctx.nr_bytes);
 
 	FreeDeviceBuffer(dev_buffer);
 
