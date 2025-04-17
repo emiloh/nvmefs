@@ -207,6 +207,35 @@ bool NvmeFileSystem::OnDiskFile(FileHandle &handle) {
 	return true;
 }
 
+void NvmeFileSystem::Truncate(FileHandle &handle, int64_t new_size) {
+	NvmeFileHandle &nvme_handle = handle.Cast<NvmeFileHandle>();
+	int64_t current_size = GetFileSize(nvme_handle);
+
+	if(new_size <= current_size){
+		MetadataType type = GetMetadataType(nvme_handle.path);
+		idx_t new_lba_location = nvme_handle.CalculateRequiredLBACount(new_size);
+
+		switch (type)
+		{
+		case MetadataType::WAL:
+			metadata->write_ahead_log.location = metadata->write_ahead_log.start + new_lba_location;
+			break;
+		case MetadataType::DATABASE:
+			metadata->database.location = metadata->database.start + new_lba_location;
+			break;
+		case MetadataType::TEMPORARY:
+			// TODO: Handle fragmentation? Truncating a file that not have been allocated last
+			file_to_temp_meta[nvme_handle.path].end = file_to_temp_meta[nvme_handle.path].start + new_lba_location;
+			break;
+		default:
+			throw InvalidInputException("Unknown metadata type");
+			break;
+		}
+	} else {
+		throw InvalidInputException("new_size is bigger than the current file size.");
+	}
+}
+
 bool NvmeFileSystem::DirectoryExists(const string &directory, optional_ptr<FileOpener> opener) {
 	// The directory exists if metadata exists
 	if (TryLoadMetadata()) {

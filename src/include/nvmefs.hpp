@@ -86,6 +86,7 @@ public:
 	int64_t GetFileSize(FileHandle &handle) override;
 	void FileSync(FileHandle &handle) override;
 	bool OnDiskFile(FileHandle &handle) override;
+	void Truncate(FileHandle &handle, int64_t new_size) override;
 	bool DirectoryExists(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
 	void RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
 	void CreateDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
