@@ -81,6 +81,10 @@ NvmeFileSystem::~NvmeFileSystem() {
 	WriteMetadata(*metadata);
 }
 
+NvmeFileSystem::~NvmeFileSystem() {
+	WriteMetadata(*metadata);
+}
+
 unique_ptr<FileHandle> NvmeFileSystem::OpenFile(const string &path, FileOpenFlags flags,
                                                 optional_ptr<FileOpener> opener) {
 	bool internal = StringUtil::Equals(NVMEFS_GLOBAL_METADATA_PATH.data(), path.data());
