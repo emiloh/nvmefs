@@ -512,8 +512,8 @@ void NvmeFileSystem::InitializeMetadata(const string &filename) {
 	global->db_start = 1;
 	global->wal_start = wal_start;
 	global->tmp_start = temp_start;
-	global->db_location = 0;
-	global->wal_location = 0;
+	global->db_location = 1;
+	global->wal_location = wal_start;
 	global->db_path_size = filename.length();
 
 	strncpy(global->db_path, filename.data(), filename.length());
