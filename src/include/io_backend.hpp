@@ -1,3 +1,5 @@
+#pragma once
+
 #include "io_request.hpp"
 #include "concurrentqueue.h"
 #include <libxnvme.h>
@@ -5,6 +7,12 @@
 namespace duckdb {
 
 typedef void *backend_buf_ptr;
+
+struct BackendGeometry {
+	idx_t lba_size;
+	idx_t lba_count;
+	uint32_t device_ns_id;
+};
 
 class IOBackend {
 public:
@@ -18,6 +26,14 @@ public:
 			xnvme_cli_perr("xnvme_dev_open()", errno);
 			throw InternalException("Unable to open device");
 		}
+
+		const xnvme_geo *geo = xnvme_dev_get_geo(device);
+		const xnvme_spec_idfy_ns *nsgeo = xnvme_dev_get_ns(device);
+		const uint32_t nsid = xnvme_dev_get_nsid(device);
+
+		geometry.lba_size = geo->lba_nbytes;
+		geometry.lba_count = nsgeo->nsze;
+		geometry.device_ns_id = nsid;
 	}
 
 	virtual ~IOBackend() = default;
@@ -28,25 +44,38 @@ public:
 	/// @return The number of LBA blocks that were submitted.
 	virtual idx_t SubmitRequest(IORequest request) = 0;
 
-	virtual IORequest CreateReadRequest(idx_t lba_location, idx_t lba_count);
-	virtual IORequest CreateWriteRequest(idx_t lba_location, idx_t lba_count);
+	virtual IORequest CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer);
+	virtual IORequest CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer);
 
 	virtual void Sync();
 
-protected:
 	/// @brief Allocates a backend specific buffer. Should be freed with FreeDeviceBuffer.
 	/// @param nr_bytes The number of bytes to allocate (The allocated buffer might be larger)
 	/// @return Pointer to allocated device buffer
-	backend_buf_ptr AllocateBuffer(idx_t nr_bytes);
+	backend_buf_ptr AllocateBuffer(idx_t nr_bytes) {
+		return xnvme_buf_alloc(device, nr_bytes);
+	}
 
 	/// @brief Frees a backend specific buffer
 	/// @param buffer The buffer to free
-	void FreeBuffer(backend_buf_ptr buffer);
+	void FreeBuffer(backend_buf_ptr buffer) {
+		xnvme_buf_free(device, buffer);
+	}
 
+	idx_t GetLBASize() {
+		return geometry.lba_size;
+	}
+
+	idx_t GetLBACount() {
+		return geometry.lba_count;
+	}
+
+protected:
 	virtual string GetName();
 
 protected:
 	xnvme_dev *device;
+	BackendGeometry geometry;
 
 private:
 	void PrepareOpts(xnvme_opts &opts, bool async) {
@@ -73,8 +102,8 @@ public:
 
 	idx_t SubmitRequest(IORequest request) override;
 
-	IORequest CreateReadRequest(idx_t lba_location, idx_t lba_count) override;
-	IORequest CreateWriteRequest(idx_t lba_location, idx_t lba_count) override;
+	IORequest CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
+	IORequest CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
 
 	void Sync() override;
 
@@ -90,8 +119,8 @@ public:
 
 	idx_t SubmitRequest(IORequest request) override;
 
-	IORequest CreateReadRequest(idx_t lba_location, idx_t lba_count) override;
-	IORequest CreateWriteRequest(idx_t lba_location, idx_t lba_count) override;
+	IORequest CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
+	IORequest CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
 
 	void Sync() override; // TODO: How are we going to sync the async requests?
 

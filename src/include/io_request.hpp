@@ -1,3 +1,5 @@
+#pragma once
+
 #include "duckdb.hpp"
 #include <future>
 
@@ -5,20 +7,47 @@ namespace duckdb {
 
 enum RequestType { READ, WRITE };
 
+struct FileSystemBuffer {
+	// Buffer from the file system
+	void *buffer;
+
+	// Size of the buffer
+	idx_t size;
+
+	// Offset in a block of an lba to read/write
+	idx_t offset;
+};
+
 class IORequest {
 public:
-	IORequest(idx_t lba_location, idx_t lba_count, idx_t lba_size, void *buffer, RequestType type)
-	    : lba_location(lba_location), lba_count(lba_count), lba_size(lba_size), buffer(buffer), type(type) {
+	IORequest(idx_t lba_location, idx_t lba_size, idx_t nr_lbas, backend_buf_ptr buffer, RequestType type)
+	    : lba_location(lba_location), lba_count(nr_lbas), buffer(buffer), type(type), lba_size(lba_size) {
 	}
 
 	virtual bool WaitForCompletion();
 
-	void *GetBuffer() {
+	backend_buf_ptr GetBuffer() {
 		return buffer;
 	}
 
-	idx_t GetBufferSize() {
+	idx_t GetBufferSizeInBytes() {
 		return lba_count * lba_size;
+	}
+
+	idx_t GetLBALocation() {
+		return lba_location;
+	}
+
+	idx_t GetLBACount() {
+		return lba_count;
+	}
+
+	bool IsRead() {
+		return type == RequestType::READ;
+	}
+
+	bool IsWrite() {
+		return type == RequestType::WRITE;
 	}
 
 private:
@@ -26,13 +55,13 @@ private:
 	idx_t lba_count;
 	idx_t lba_size;
 	RequestType type;
-	void *buffer;
+	backend_buf_ptr buffer;
 };
 
-class SyncIoRequest : public IORequest {
+class SyncIORequest : public IORequest {
 public:
-	SyncIoRequest(idx_t lba_location, idx_t lba_count, idx_t lba_size, void *buffer, RequestType type)
-	    : IORequest(lba_location, lba_count, lba_size, buffer, type) {
+	SyncIORequest(idx_t lba_location, idx_t lba_size, idx_t nr_lbas, backend_buf_ptr buffer, RequestType type)
+	    : IORequest(lba_location, lba_size, nr_lbas, buffer, type) {
 		// Constructor implementation
 	}
 
@@ -44,10 +73,10 @@ public:
 	}
 };
 
-class AsyncIoRequest : public IORequest {
+class AsyncIORequest : public IORequest {
 public:
-	AsyncIoRequest(idx_t lba_location, idx_t lba_count, idx_t lba_size, void *buffer, RequestType type)
-	    : IORequest(lba_location, lba_count, lba_size, buffer, type), promise(make_uniq<std::promise<bool>>()),
+	AsyncIORequest(idx_t lba_location, idx_t lba_size, idx_t nr_lbas, backend_buf_ptr buffer, RequestType type)
+	    : IORequest(lba_location, lba_size, nr_lbas, buffer, type), promise(make_uniq<std::promise<bool>>()),
 	      future(promise->get_future()) {
 		// Constructor implementation
 	}
