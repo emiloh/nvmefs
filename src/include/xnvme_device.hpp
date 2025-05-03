@@ -19,6 +19,7 @@ public:
 
 private:
 	unique_ptr<IOBackend> backend;
+	map<string, uint8_t> allocated_placement_identifiers;
 };
 
 } // namespace duckdb

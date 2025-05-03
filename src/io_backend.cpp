@@ -10,11 +10,13 @@ idx_t IOBackend::SubmitRequest(IORequest &request) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
-unique_ptr<IORequest> IOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> IOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+                                                   backend_buf_ptr buffer) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
-unique_ptr<IORequest> IOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> IOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+                                                    backend_buf_ptr buffer) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
@@ -35,12 +37,14 @@ SyncIOBackend::~SyncIOBackend() {
 	// Cleanup resources
 }
 
-unique_ptr<IORequest> SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+                                                       backend_buf_ptr buffer) {
 
 	return make_uniq<SyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
 }
 
-unique_ptr<IORequest> SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+                                                        backend_buf_ptr buffer) {
 
 	return make_uniq<SyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
 }
@@ -86,11 +90,13 @@ AsyncIOBackend::~AsyncIOBackend() {
 	// TODO: Stop the event loop and cleanup the queue
 }
 
-unique_ptr<IORequest> AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+                                                        backend_buf_ptr buffer) {
 	return make_uniq<AsyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
 }
 
-unique_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+                                                         backend_buf_ptr buffer) {
 	return make_uniq<AsyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
 }
 

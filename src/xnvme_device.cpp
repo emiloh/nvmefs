@@ -1,5 +1,6 @@
 #include "duckdb.hpp"
 #include "xnvme_device.hpp"
+#include "nvme_device.hpp"
 
 namespace duckdb {
 
@@ -11,6 +12,8 @@ XNVMeDevice::XNVMeDevice(const string &device_path, const idx_t placement_handle
 	} else {
 		this->backend = make_uniq<SyncIOBackend>(device_path, placement_handles, backend);
 	}
+
+	allocated_placement_identifiers["nvmefs:///tmp"] = 1;
 }
 
 DeviceGeometry XNVMeDevice::GetDeviceGeometry() {
@@ -22,20 +25,35 @@ DeviceGeometry XNVMeDevice::GetDeviceGeometry() {
 	return geometry;
 }
 
+static uint8_t GetPlacementIdentifierOrDefault(map<string, uint8_t> identifiers, const string &path) {
+	uint8_t placement_identifier = 0;
+	for (const auto &kv : identifiers) {
+		if (StringUtil::StartsWith(path, kv.first)) {
+			placement_identifier = kv.second;
+		}
+	}
+
+	return placement_identifier;
+}
+
 idx_t XNVMeDevice::Read(void *buffer, const CmdContext &context) {
 	D_ASSERT(context.nr_lbas > 0);
 	// We only support offset reads within a single block
 	D_ASSERT((context.offset == 0 && context.nr_lbas > 1) || (context.offset >= 0 && context.nr_lbas == 1));
 
-	backend_buf_ptr backend_buffer = backend->AllocateBuffer(context.nr_bytes);
-	IORequest req = backend->CreateReadRequest(context.start_lba, context.nr_lbas, backend_buffer);
+	string filepath = static_cast<const NvmeCmdContext &>(context).filepath;
+	uint8_t plid_idx = GetPlacementIdentifierOrDefault(allocated_placement_identifiers, filepath);
 
-	if (!backend->SubmitRequest(req)) {
+	backend_buf_ptr backend_buffer = backend->AllocateBuffer(context.nr_bytes);
+	unique_ptr<IORequest> req =
+	    backend->CreateReadRequest(context.start_lba, context.nr_lbas, plid_idx, backend_buffer);
+
+	if (!backend->SubmitRequest(*req)) {
 		backend->FreeBuffer(backend_buffer);
 		throw InternalException("Failed to submit read request");
 	}
 
-	if (!req.WaitForCompletion()) {
+	if (!req->WaitForCompletion()) {
 		backend->FreeBuffer(backend_buffer);
 		throw InternalException("Failed to wait for read request completion");
 	}
@@ -59,14 +77,18 @@ idx_t XNVMeDevice::Write(void *buffer, const CmdContext &context) {
 	}
 	memcpy(backend_buffer, (char *)buffer + context.offset, context.nr_bytes);
 
-	IORequest req = backend->CreateWriteRequest(context.start_lba, context.nr_lbas, backend_buffer);
+	string filepath = static_cast<const NvmeCmdContext &>(context).filepath;
+	uint8_t plid_idx = GetPlacementIdentifierOrDefault(allocated_placement_identifiers, filepath);
 
-	if (!backend->SubmitRequest(req)) {
+	unique_ptr<IORequest> req =
+	    backend->CreateWriteRequest(context.start_lba, context.nr_lbas, plid_idx, backend_buffer);
+
+	if (!backend->SubmitRequest(*req)) {
 		backend->FreeBuffer(backend_buffer);
 		throw InternalException("Failed to submit read request");
 	}
 
-	if (!req.WaitForCompletion()) {
+	if (!req->WaitForCompletion()) {
 		backend->FreeBuffer(backend_buffer);
 		throw InternalException("Failed to wait for read request completion");
 	}

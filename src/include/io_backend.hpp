@@ -46,8 +46,10 @@ public:
 	/// @return The number of LBA blocks that were submitted.
 	virtual idx_t SubmitRequest(IORequest &request) = 0;
 
-	virtual unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer);
-	virtual unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer);
+	virtual unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	                                                backend_buf_ptr buffer);
+	virtual unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	                                                 backend_buf_ptr buffer);
 
 	virtual void Sync();
 
@@ -103,8 +105,10 @@ public:
 
 	idx_t SubmitRequest(IORequest &request) override;
 
-	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
-	unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
+	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	                                        backend_buf_ptr buffer) override;
+	unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	                                         backend_buf_ptr buffer) override;
 
 	void Sync() override;
 
@@ -120,8 +124,10 @@ public:
 
 	idx_t SubmitRequest(IORequest &request) override;
 
-	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
-	unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) override;
+	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	                                        backend_buf_ptr buffer) override;
+	unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	                                         backend_buf_ptr buffer) override;
 
 	void Sync() override; // TODO: How are we going to sync the async requests?
 
