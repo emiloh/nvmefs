@@ -133,12 +133,15 @@ private:
 	void RunEventLoop();
 	void StopEventLoop();
 
+	void ProcessRequestFromQueue(idx_t max_items);
+
 	static void RequestCallback(xnvme_cmd_ctx *ctx, void *data);
 
 private:
 	duckdb_moodycamel::ConcurrentQueue<AsyncIORequest &> request_queue;
 	std::thread event_loop_thread;
 	std::atomic<bool> stop_event_loop;
+	std::atomic<bool> sync_io_requests;
 	xnvme_queue *queue;
 };
 

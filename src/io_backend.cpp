@@ -102,50 +102,27 @@ idx_t AsyncIOBackend::SubmitRequest(IORequest &request) {
 }
 
 void AsyncIOBackend::Sync() {
+	// NOTE: This is probably a naive approach.. but i am tired
+	sync_io_requests.store(true);
 }
 
 void AsyncIOBackend::RunEventLoop() {
 	auto loop_function = [this]() {
 		while (!stop_event_loop.load()) {
 
-			// Get elements from the queue
-			AsyncIORequest *requests[8];
-			size_t nr_dequeued_items = request_queue.try_dequeue_bulk(requests, 8);
+			if (sync_io_requests.load()) {
+				size_t items_in_queue = request_queue.size_approx();
 
-			for (size_t i = 0; i < nr_dequeued_items; i++) {
-				AsyncIORequest *request = requests[i];
-				xnvme_cmd_ctx *xnvme_ctx = xnvme_queue_get_cmd_ctx(queue);
+				// Process requests from the queue
+				ProcessRequestFromQueue(items_in_queue);
 
-				idx_t lba_location = request->GetLBALocation();
-				idx_t lba_count = request->GetLBACount();
-
-				// Set the command context
-				xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, &request);
-
-				// Prepare the command
-				int err = 0; // If successful, ret will be 0
-				int retries = 3;
-				do {
-					if (request->IsRead()) {
-						err = xnvme_nvm_read(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
-						                     request->GetBuffer(), nullptr);
-					} else {
-						err = xnvme_nvm_write(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
-						                      request->GetBuffer(), nullptr);
-					}
-
-					if (err == -EBUSY)
-						xnvme_queue_poke(queue, 0); // Submission queue is full. Go through all completed items
-
-					retries--;
-				} while (err && retries > 0);
-
-				if (err && retries <= 0) {
-					xnvme_cli_perr("Encountered error when submitting request to NVMe device: ", err);
-					request->Failed();
-					xnvme_queue_put_cmd_ctx(queue, xnvme_ctx);
-				}
+				xnvme_queue_drain(queue); // Process all completed items
+				sync_io_requests.store(false);
+				continue;
 			}
+
+			// Process requests from the queue
+			ProcessRequestFromQueue(8);
 
 			// Wait for an event to be available
 			xnvme_queue_poke(queue, 10);
@@ -159,6 +136,47 @@ void AsyncIOBackend::StopEventLoop() {
 
 	stop_event_loop.store(true);
 	event_loop_thread.join();
+}
+
+void AsyncIOBackend::ProcessRequestFromQueue(idx_t max_items) {
+	// Process requests from the queue
+	AsyncIORequest *requests[8];
+	size_t nr_dequeued_items = request_queue.try_dequeue_bulk(requests, max_items);
+
+	for (size_t i = 0; i < nr_dequeued_items; i++) {
+		AsyncIORequest *request = requests[i];
+		xnvme_cmd_ctx *xnvme_ctx = xnvme_queue_get_cmd_ctx(queue);
+
+		idx_t lba_location = request->GetLBALocation();
+		idx_t lba_count = request->GetLBACount();
+
+		// Set the command context
+		xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, &request);
+
+		// Prepare the command
+		int err = 0; // If successful, ret will be 0
+		int retries = 3;
+		do {
+			if (request->IsRead()) {
+				err = xnvme_nvm_read(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
+				                     request->GetBuffer(), nullptr);
+			} else {
+				err = xnvme_nvm_write(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
+				                      request->GetBuffer(), nullptr);
+			}
+
+			if (err == -EBUSY)
+				xnvme_queue_poke(queue, 0); // Submission queue is full. Go through all completed items
+
+			retries--;
+		} while (err && retries > 0);
+
+		if (err && retries <= 0) {
+			xnvme_cli_perr("Encountered error when submitting request to NVMe device: ", err);
+			request->Failed();
+			xnvme_queue_put_cmd_ctx(queue, xnvme_ctx);
+		}
+	}
 }
 
 void AsyncIOBackend::RequestCallback(xnvme_cmd_ctx *ctx, void *data) {
