@@ -12,12 +12,13 @@ struct BackendGeometry {
 	idx_t lba_size;
 	idx_t lba_count;
 	uint32_t device_ns_id;
+	idx_t plhdls;
 };
 
 class IOBackend {
 public:
 	IOBackend(const string &device_path, const idx_t placement_handles, const string &backend, bool async)
-	    : dev_path(device_path), plhdls(placement_handles), backend(backend) {
+	    : dev_path(device_path), backend(backend) {
 
 		xnvme_opts opts = xnvme_opts_default();
 		PrepareOpts(opts, async);
@@ -34,6 +35,7 @@ public:
 		geometry.lba_size = geo->lba_nbytes;
 		geometry.lba_count = nsgeo->nsze;
 		geometry.device_ns_id = nsid;
+		geometry.plhdls = placement_handles;
 	}
 
 	virtual ~IOBackend() = default;
@@ -91,7 +93,6 @@ private:
 
 private:
 	string dev_path;
-	idx_t plhdls;
 	string backend;
 };
 
@@ -134,6 +135,7 @@ private:
 	void StopEventLoop();
 
 	void ProcessRequestFromQueue(idx_t max_items);
+	void PrepareRequest(xnvme_cmd_ctx *ctx, AsyncIORequest &request);
 
 	static void RequestCallback(xnvme_cmd_ctx *ctx, void *data);
 

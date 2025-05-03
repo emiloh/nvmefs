@@ -146,6 +146,7 @@ void AsyncIOBackend::ProcessRequestFromQueue(idx_t max_items) {
 	for (size_t i = 0; i < nr_dequeued_items; i++) {
 		AsyncIORequest *request = requests[i];
 		xnvme_cmd_ctx *xnvme_ctx = xnvme_queue_get_cmd_ctx(queue);
+		PrepareRequest(xnvme_ctx, *request);
 
 		idx_t lba_location = request->GetLBALocation();
 		idx_t lba_count = request->GetLBACount();
@@ -177,6 +178,21 @@ void AsyncIOBackend::ProcessRequestFromQueue(idx_t max_items) {
 			xnvme_queue_put_cmd_ctx(queue, xnvme_ctx);
 		}
 	}
+}
+
+void AsyncIOBackend::PrepareRequest(xnvme_cmd_ctx *ctx, AsyncIORequest &request) {
+	// Retrieve information about recliam unit handles
+	struct xnvme_spec_ruhs *ruhs = nullptr;
+	// TODO: verify this calculation!!
+	uint32_t ruhs_nbytes = sizeof(*ruhs) + geometry.plhdls + sizeof(struct xnvme_spec_ruhs_desc);
+	ruhs = (struct xnvme_spec_ruhs *)xnvme_buf_alloc(device, ruhs_nbytes);
+	memset(ruhs, 0, ruhs_nbytes);
+	xnvme_nvm_mgmt_recv(ctx, geometry.device_ns_id, XNVME_SPEC_IO_MGMT_RECV_RUHS, 0, ruhs, ruhs_nbytes);
+
+	uint16_t phid = ruhs->desc[request.GetFDPPlacementIndex()].pi;
+	ctx->cmd.common.cdw13 = phid << 16;
+
+	xnvme_buf_free(device, ruhs);
 }
 
 void AsyncIOBackend::RequestCallback(xnvme_cmd_ctx *ctx, void *data) {

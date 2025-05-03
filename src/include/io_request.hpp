@@ -7,39 +7,41 @@ namespace duckdb {
 
 enum RequestType { READ, WRITE };
 
-struct FileSystemBuffer {
-	// Buffer from the file system
-	void *buffer;
-
-	// Size of the buffer
-	idx_t size;
+struct RequestOptions {
 
 	// Offset in a block of an lba to read/write
-	idx_t offset;
+	uint8_t fdp_placement_index;
+	idx_t lba_location;
+	idx_t lba_size;
+	idx_t lba_count;
+	backend_buf_ptr buffer;
 };
 
 class IORequest {
 public:
-	IORequest(idx_t lba_location, idx_t lba_size, idx_t nr_lbas, backend_buf_ptr buffer, RequestType type)
-	    : lba_location(lba_location), lba_count(nr_lbas), buffer(buffer), type(type), lba_size(lba_size) {
+	IORequest(RequestOptions opts, RequestType type) : options(opts), type(type) {
 	}
 
 	virtual bool WaitForCompletion();
 
 	backend_buf_ptr GetBuffer() {
-		return buffer;
+		return options.buffer;
 	}
 
 	idx_t GetBufferSizeInBytes() {
-		return lba_count * lba_size;
+		return options.lba_count * options.lba_size;
 	}
 
 	idx_t GetLBALocation() {
-		return lba_location;
+		return options.lba_location;
 	}
 
 	idx_t GetLBACount() {
-		return lba_count;
+		return options.lba_count;
+	}
+
+	uint8_t GetFDPPlacementIndex() {
+		return options.fdp_placement_index;
 	}
 
 	bool IsRead() {
@@ -51,17 +53,13 @@ public:
 	}
 
 private:
-	idx_t lba_location;
-	idx_t lba_count;
-	idx_t lba_size;
+	RequestOptions options;
 	RequestType type;
-	backend_buf_ptr buffer;
 };
 
 class SyncIORequest : public IORequest {
 public:
-	SyncIORequest(idx_t lba_location, idx_t lba_size, idx_t nr_lbas, backend_buf_ptr buffer, RequestType type)
-	    : IORequest(lba_location, lba_size, nr_lbas, buffer, type) {
+	SyncIORequest(RequestOptions opts, RequestType type) : IORequest(opts, type) {
 		// Constructor implementation
 	}
 
@@ -75,9 +73,8 @@ public:
 
 class AsyncIORequest : public IORequest {
 public:
-	AsyncIORequest(idx_t lba_location, idx_t lba_size, idx_t nr_lbas, backend_buf_ptr buffer, RequestType type)
-	    : IORequest(lba_location, lba_size, nr_lbas, buffer, type), promise(make_uniq<std::promise<bool>>()),
-	      future(promise->get_future()) {
+	AsyncIORequest(RequestOptions opts, RequestType type)
+	    : IORequest(opts, type), promise(make_uniq<std::promise<bool>>()), future(promise->get_future()) {
 		// Constructor implementation
 	}
 
