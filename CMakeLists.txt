@@ -17,6 +17,7 @@ set(EXTENSION_SOURCES
   src/device.cpp
   src/nvme_device.cpp
   src/io_backend.cpp
+  src/xnvme_device.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
