@@ -81,6 +81,16 @@ public:
 		// Constructor implementation
 	}
 
+	void Failed() {
+		// Set the promise to indicate failure
+		promise->set_value(false);
+	}
+
+	void Success() {
+		// Set the promise to indicate success
+		promise->set_value(true);
+	}
+
 	/// @brief Waits for the request to complete. This is a blocking call.
 	/// @return true if the request completed successfully, false otherwise
 	bool WaitForCompletion() override {

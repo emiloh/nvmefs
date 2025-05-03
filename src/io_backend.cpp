@@ -6,15 +6,15 @@ IOBackend::~IOBackend() {
 	xnvme_dev_close(device);
 }
 
-idx_t IOBackend::SubmitRequest(IORequest request) {
+idx_t IOBackend::SubmitRequest(IORequest &request) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
-IORequest IOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> IOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
-IORequest IOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> IOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
@@ -35,17 +35,17 @@ SyncIOBackend::~SyncIOBackend() {
 	// Cleanup resources
 }
 
-IORequest SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
 
-	return SyncIORequest(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
+	return make_uniq<SyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
 }
 
-IORequest SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+unique_ptr<IORequest> SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
 
-	return SyncIORequest(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
+	return make_uniq<SyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
 }
 
-idx_t SyncIOBackend::SubmitRequest(IORequest request) {
+idx_t SyncIOBackend::SubmitRequest(IORequest &request) {
 	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(device);
 
 	idx_t lba_location = request.GetLBALocation();
@@ -74,25 +74,93 @@ idx_t SyncIOBackend::SubmitRequest(IORequest request) {
 
 AsyncIOBackend::AsyncIOBackend(const string &device_path, const idx_t placement_handles, const string &backend)
     : IOBackend(device_path, placement_handles, backend, true) {
-	// TOOD: Init the queue and start the event loop
+
+	int err = xnvme_queue_init(device, 16, 0, &queue); // Queue depth of 16... for now
+	if (err) {
+		xnvme_cli_perr("Unable to create an queue for asynchronous IO", err);
+	}
 }
 
 AsyncIOBackend::~AsyncIOBackend() {
+	StopEventLoop();
 	// TODO: Stop the event loop and cleanup the queue
 }
 
-IORequest AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
-	return AsyncIORequest(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
+unique_ptr<IORequest> AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+	return make_uniq<AsyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
 }
 
-IORequest AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
-	return AsyncIORequest(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
+unique_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, backend_buf_ptr buffer) {
+	return make_uniq<AsyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
 }
 
-idx_t AsyncIOBackend::SubmitRequest(IORequest request) {
-	request_queue.enqueue(request);
+idx_t AsyncIOBackend::SubmitRequest(IORequest &request) {
+	AsyncIORequest &async_request = static_cast<AsyncIORequest &>(request);
+	request_queue.enqueue(async_request);
 
 	return 0;
+}
+
+void AsyncIOBackend::Sync() {
+}
+
+void AsyncIOBackend::RunEventLoop() {
+	auto loop_function = [this]() {
+		while (!stop_event_loop.load()) {
+
+			// Get elements from the queue
+			AsyncIORequest *requests[8];
+			size_t nr_dequeued_items = request_queue.try_dequeue_bulk(requests, 8);
+
+			for (size_t i = 0; i < nr_dequeued_items; i++) {
+				AsyncIORequest *request = requests[i];
+				xnvme_cmd_ctx *xnvme_ctx = xnvme_queue_get_cmd_ctx(queue);
+
+				idx_t lba_location = request->GetLBALocation();
+				idx_t lba_count = request->GetLBACount();
+
+				// Set the command context
+				xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, &request);
+
+				// Prepare the command
+				int ret = 0;
+				if (request->IsRead()) {
+					ret = xnvme_nvm_read(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
+					                     request->GetBuffer(), nullptr);
+				} else {
+					ret = xnvme_nvm_write(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
+					                      request->GetBuffer(), nullptr);
+				}
+
+				if (ret == -EBUSY)
+					xnvme_queue_poke(queue, 0); // Queue is busy. Go through all completed items
+			}
+
+			// Wait for an event to be available
+			if (xnvme_queue_wait)
+				xnvme_queue_poke(queue, 10);
+		}
+	};
+
+	event_loop_thread = std::thread(loop_function); // Start the event loop in a separate thread
+}
+
+void AsyncIOBackend::StopEventLoop() {
+
+	stop_event_loop.store(true);
+	event_loop_thread.join();
+}
+
+void AsyncIOBackend::RequestCallback(xnvme_cmd_ctx *ctx, void *data) {
+	// Handle the completion of the request
+	AsyncIORequest *request = static_cast<AsyncIORequest *>(data);
+
+	// if (!ctx->cpl.result) {
+	// 	request->Failed();
+	// 	return;
+	// }
+
+	request->Success();
 }
 
 } // namespace duckdb
