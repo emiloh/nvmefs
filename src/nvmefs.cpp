@@ -1,4 +1,6 @@
 #include "nvmefs.hpp"
+#include "nvme_device.hpp"
+#include "xnvme_device.hpp"
 
 namespace duckdb {
 NvmeFileHandle::NvmeFileHandle(FileSystem &file_system, string path, FileOpenFlags flags)
@@ -67,7 +69,7 @@ std::recursive_mutex NvmeFileSystem::api_lock;
 
 NvmeFileSystem::NvmeFileSystem(NvmeConfig config)
     : allocator(Allocator::DefaultAllocator()),
-      device(make_uniq<NvmeDevice>(config.device_path, config.plhdls, config.backend, config.async)),
+      device(make_uniq<XNVMeDevice>(config.device_path, config.plhdls, config.backend, config.async)),
       max_temp_size(config.max_temp_size), max_wal_size(config.max_wal_size) {
 }
 
@@ -381,33 +383,32 @@ idx_t NvmeFileSystem::SeekPosition(FileHandle &handle) {
 	return handle.Cast<NvmeFileHandle>().GetFilePointer();
 }
 
-bool NvmeFileSystem::ListFiles(const string &directory,
-	const std::function<void(const string &, bool)> &callback,
-	FileOpener *opener) {
-		api_lock.lock();
-		bool dir = false;
-		if (StringUtil::Equals(directory.data(), NVMEFS_PATH_PREFIX.data())) {
-			const string db_filename_no_ext = StringUtil::GetFileStem(metadata->db_path);
-			const string db_filename_with_ext = db_filename_no_ext + ".db";
-			const string db_wal = db_filename_with_ext + ".wal";
-			const string db_tmp = "/tmp";
+bool NvmeFileSystem::ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
+                               FileOpener *opener) {
+	api_lock.lock();
+	bool dir = false;
+	if (StringUtil::Equals(directory.data(), NVMEFS_PATH_PREFIX.data())) {
+		const string db_filename_no_ext = StringUtil::GetFileStem(metadata->db_path);
+		const string db_filename_with_ext = db_filename_no_ext + ".db";
+		const string db_wal = db_filename_with_ext + ".wal";
+		const string db_tmp = "/tmp";
 
-			callback(db_filename_with_ext, false);
-			callback(db_tmp, true);
-			callback(db_wal, false);
+		callback(db_filename_with_ext, false);
+		callback(db_tmp, true);
+		callback(db_wal, false);
 
-			dir = true;
-		} else if (StringUtil::Equals(directory.data(), NVMEFS_TMP_DIR_PATH.data())) {
-			for(const auto& kv : file_to_temp_meta) {
-				callback(StringUtil::GetFileName(kv.first), false);
-			}
-			dir = true;
+		dir = true;
+	} else if (StringUtil::Equals(directory.data(), NVMEFS_TMP_DIR_PATH.data())) {
+		for (const auto &kv : file_to_temp_meta) {
+			callback(StringUtil::GetFileName(kv.first), false);
 		}
-		api_lock.unlock();
-		return dir;
+		dir = true;
+	}
+	api_lock.unlock();
+	return dir;
 }
 
-optional_idx NvmeFileSystem::GetAvailableDiskSpace(const string &path){
+optional_idx NvmeFileSystem::GetAvailableDiskSpace(const string &path) {
 	api_lock.lock();
 	DeviceGeometry geo = device->GetDeviceGeometry();
 	const string db_filename_no_ext = StringUtil::GetFileStem(metadata->db_path);
@@ -416,25 +417,26 @@ optional_idx NvmeFileSystem::GetAvailableDiskSpace(const string &path){
 
 	optional_idx remaining;
 
-	if (StringUtil::Equals(path.data(), NVMEFS_PATH_PREFIX.data())){
+	if (StringUtil::Equals(path.data(), NVMEFS_PATH_PREFIX.data())) {
 		idx_t db_max_bytes = (metadata->database.end - metadata->database.start) * geo.lba_size;
 		idx_t wal_max_bytes = (metadata->write_ahead_log.end - metadata->write_ahead_log.start) * geo.lba_size;
 		idx_t temp_max_bytes = (metadata->temporary.end - metadata->temporary.start) * geo.lba_size;
 
 		idx_t db_used_bytes = (metadata->database.location - metadata->database.start) * geo.lba_size;
 		idx_t wal_used_bytes = (metadata->write_ahead_log.location - metadata->write_ahead_log.start) * geo.lba_size;
-		idx_t temp_used_bytes{};
+		idx_t temp_used_bytes {};
 
-		for (const auto& kv : file_to_temp_meta) {
+		for (const auto &kv : file_to_temp_meta) {
 			temp_used_bytes += kv.second.block_size * kv.second.block_map.size();
 		}
 
-		remaining = (db_max_bytes - db_used_bytes) + (wal_max_bytes - wal_used_bytes) + (temp_max_bytes - temp_used_bytes);
+		remaining =
+		    (db_max_bytes - db_used_bytes) + (wal_max_bytes - wal_used_bytes) + (temp_max_bytes - temp_used_bytes);
 	} else if (StringUtil::Equals(path.data(), NVMEFS_TMP_DIR_PATH.data())) {
 		idx_t temp_max_bytes = (metadata->temporary.end - metadata->temporary.start) * geo.lba_size;
-		idx_t temp_used_bytes{};
+		idx_t temp_used_bytes {};
 
-		for (const auto& kv : file_to_temp_meta) {
+		for (const auto &kv : file_to_temp_meta) {
 			temp_used_bytes += kv.second.block_size * kv.second.block_map.size();
 		}
 

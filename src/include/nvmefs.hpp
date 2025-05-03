@@ -5,7 +5,6 @@
 #include "duckdb/common/map.hpp"
 
 #include "device.hpp"
-#include "nvme_device.hpp"
 #include "nvmefs_config.hpp"
 #include "nvmefs_temporary_block_manager.hpp"
 
@@ -96,9 +95,8 @@ public:
 	void Seek(FileHandle &handle, idx_t location) override;
 	void Reset(FileHandle &handle);
 	idx_t SeekPosition(FileHandle &handle) override;
-	bool ListFiles(const string &directory,
-		const std::function<void(const string &, bool)> &callback,
-		FileOpener *opener = nullptr);
+	bool ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
+	               FileOpener *opener = nullptr);
 	optional_idx GetAvailableDiskSpace(const string &path);
 	bool Trim(FileHandle &handle, idx_t offset_bytes, idx_t length_bytes) override;
 
