@@ -123,22 +123,32 @@ void AsyncIOBackend::RunEventLoop() {
 				xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, &request);
 
 				// Prepare the command
-				int ret = 0;
-				if (request->IsRead()) {
-					ret = xnvme_nvm_read(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
-					                     request->GetBuffer(), nullptr);
-				} else {
-					ret = xnvme_nvm_write(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
-					                      request->GetBuffer(), nullptr);
-				}
+				int err = 0; // If successful, ret will be 0
+				int retries = 3;
+				do {
+					if (request->IsRead()) {
+						err = xnvme_nvm_read(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
+						                     request->GetBuffer(), nullptr);
+					} else {
+						err = xnvme_nvm_write(xnvme_ctx, geometry.device_ns_id, lba_location, lba_count - 1,
+						                      request->GetBuffer(), nullptr);
+					}
 
-				if (ret == -EBUSY)
-					xnvme_queue_poke(queue, 0); // Queue is busy. Go through all completed items
+					if (err == -EBUSY)
+						xnvme_queue_poke(queue, 0); // Submission queue is full. Go through all completed items
+
+					retries--;
+				} while (err && retries > 0);
+
+				if (err && retries <= 0) {
+					xnvme_cli_perr("Encountered error when submitting request to NVMe device: ", err);
+					request->Failed();
+					xnvme_queue_put_cmd_ctx(queue, xnvme_ctx);
+				}
 			}
 
 			// Wait for an event to be available
-			if (xnvme_queue_wait)
-				xnvme_queue_poke(queue, 10);
+			xnvme_queue_poke(queue, 10);
 		}
 	};
 
@@ -155,12 +165,13 @@ void AsyncIOBackend::RequestCallback(xnvme_cmd_ctx *ctx, void *data) {
 	// Handle the completion of the request
 	AsyncIORequest *request = static_cast<AsyncIORequest *>(data);
 
-	// if (!ctx->cpl.result) {
-	// 	request->Failed();
-	// 	return;
-	// }
+	if (xnvme_cmd_ctx_cpl_status(ctx)) {
+		request->Failed();
+		return;
+	}
 
 	request->Success();
+	xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
 }
 
 } // namespace duckdb
