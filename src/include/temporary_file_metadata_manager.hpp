@@ -22,7 +22,8 @@ public:
 class TemporaryFileMetadataManager {
 public:
 	TemporaryFileMetadataManager(idx_t start_lba, idx_t end_lba, idx_t lba_size)
-	    : block_manager(make_uniq<NvmeTemporaryBlockManager>(start_lba, end_lba)), lba_size(lba_size) {
+	    : block_manager(make_uniq<NvmeTemporaryBlockManager>(start_lba, end_lba)), lba_size(lba_size),
+	      lba_amount(end_lba - start_lba) {
 	}
 
 	void CreateFile(const string &filename);
@@ -37,8 +38,17 @@ public:
 
 	bool FileExists(const string &filename);
 
+	idx_t GetFileSize(const string &filename);
+
+	void ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback);
+
+	idx_t GetAvailableSpace();
+
+	void Clear();
+
 private:
 	idx_t lba_size;
+	idx_t lba_amount;
 	unique_ptr<NvmeTemporaryBlockManager> block_manager;
 	map<string, unique_ptr<TempFileMetadata>> file_to_temp_meta;
 	std::mutex alloc_lock;

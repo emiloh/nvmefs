@@ -105,4 +105,37 @@ bool TemporaryFileMetadataManager::FileExists(const string &filename) {
 	return false;
 }
 
+idx_t TemporaryFileMetadataManager::GetFileSize(const string &filename) {
+	TempFileMetadata *tfmeta = file_to_temp_meta[filename].get();
+
+	return tfmeta->lba_location.load() * lba_size;
+}
+
+void TemporaryFileMetadataManager::Clear() {
+	alloc_lock.lock();
+	for (auto &kv : file_to_temp_meta) {
+		block_manager->FreeBlock(kv.second->block_range);
+	}
+
+	file_to_temp_meta.clear();
+	alloc_lock.unlock();
+
 } // namespace duckdb
+
+idx_t TemporaryFileMetadataManager::GetAvailableSpace() {
+	idx_t available_space = lba_amount * lba_size;
+	for (auto &kv : file_to_temp_meta) {
+		if (kv.second->is_active.load()) {
+			available_space -= kv.second->block_range->GetSizeInBytes();
+		}
+	}
+
+	return available_space;
+}
+
+void TemporaryFileMetadataManager::ListFiles(const string &directory,
+                                             const std::function<void(const string &, bool)> &callback) {
+	for (const auto &kv : file_to_temp_meta) {
+		callback(StringUtil::GetFileName(kv.first), false);
+	}
+}
