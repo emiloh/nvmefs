@@ -88,12 +88,12 @@ idx_t XNVMeDevice::Write(void *buffer, const CmdContext &context) {
 
 	if (backend->SubmitRequest(req.get())) {
 		backend->FreeBuffer(backend_buffer);
-		throw InternalException("Failed to submit read request");
+		throw InternalException("Failed to submit write request");
 	}
 
 	if (!req->WaitForCompletion()) {
 		backend->FreeBuffer(backend_buffer);
-		throw InternalException("Failed to wait for read request completion");
+		throw InternalException("Failed to wait for write request completion");
 	}
 
 	backend->FreeBuffer(backend_buffer);
