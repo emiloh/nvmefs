@@ -524,6 +524,7 @@ void NvmeFileSystem::UpdateMetadata(CmdContext &context) {
 		// The temporary metadata remain static given that location is unused.
 		// The file_to_temp_meta map will be updated during GetLBA, hence
 		// no action is required here.
+		temp_file_manager->MoveLBALocation(ctx.filepath, ctx.start_lba + ctx.nr_lbas);
 		break;
 	case MetadataType::DATABASE:
 		if (ctx.start_lba >= db_location.load()) {

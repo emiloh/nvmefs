@@ -34,7 +34,7 @@ public:
 
 	void DeleteFile(const string &filename);
 
-	void UpdateToLargerLocation(const string &filename, idx_t lba_location);
+	void MoveLBALocation(const string &filename, idx_t lba_location);
 
 	bool FileExists(const string &filename);
 

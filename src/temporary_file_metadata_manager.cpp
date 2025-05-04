@@ -58,7 +58,7 @@ idx_t TemporaryFileMetadataManager::GetLBA(const string &filename, idx_t lba_loc
 	return tfmeta.block_range->GetStartLBA() + lba_location;
 }
 
-void TemporaryFileMetadataManager::UpdateToLargerLocation(const string &filename, idx_t lba_location) {
+void TemporaryFileMetadataManager::MoveLBALocation(const string &filename, idx_t lba_location) {
 	TempFileMetadata *tfmeta = file_to_temp_meta[filename].get();
 
 	// Use atomic compare-and-swap to update lba_location if the new location is larger
