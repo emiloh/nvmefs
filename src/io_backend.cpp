@@ -97,6 +97,10 @@ AsyncIOBackend::AsyncIOBackend(const string &device_path, const idx_t placement_
 	if (err) {
 		xnvme_cli_perr("Unable to create an queue for asynchronous IO", err);
 	}
+
+	stop_event_loop.store(false);
+	sync_io_requests.store(false);
+	RunEventLoop();
 }
 
 AsyncIOBackend::~AsyncIOBackend() {
