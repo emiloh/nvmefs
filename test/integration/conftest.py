@@ -1,7 +1,7 @@
 import pytest
 import duckdb
 
-from utils.device import NvmeDevice
+from utils.device import NvmeDevice, setup_device
 
 def pytest_addoption(parser):
 
@@ -16,7 +16,7 @@ def pytest_addoption(parser):
         "--device",
         type=str,
         help="Path to the device to be used for the extension",
-        default="/dev/ng1n1"
+        default="/dev/nvme1"
     )
 
 @pytest.fixture(scope="session")
@@ -38,7 +38,8 @@ def device_path(configure, pytestconfig):
 @pytest.fixture(scope="module")
 def device(device_path):
     device = NvmeDevice(device_path)
+    namespace = setup_device(device, 1, enable_fdp=True)
 
-    yield device
+    yield namespace
 
-    device.deallocate(1)
+    device.reset()
