@@ -166,7 +166,7 @@ void AsyncIOBackend::RunEventLoop() {
 			ProcessRequestFromQueue(8);
 
 			// Wait for an event to be available
-			xnvme_queue_poke(queue, 10);
+			xnvme_queue_poke(queue, 0);
 		}
 	};
 
@@ -238,15 +238,21 @@ void AsyncIOBackend::PrepareRequest(xnvme_cmd_ctx *ctx, AsyncIORequest &request)
 
 void AsyncIOBackend::RequestCallback(xnvme_cmd_ctx *ctx, void *data) {
 	// Handle the completion of the request
+	if (!data)
+		return;
+
 	AsyncIORequest *request = static_cast<AsyncIORequest *>(data);
+	printf("Request completed: %p\n", request);
 
 	if (xnvme_cmd_ctx_cpl_status(ctx)) {
 		xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+		ctx->async.cb_arg = nullptr;
 		request->Failed();
 		return;
 	}
 
 	xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+	ctx->async.cb_arg = nullptr;
 	request->Success();
 }
 
