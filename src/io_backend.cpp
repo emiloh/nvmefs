@@ -69,16 +69,18 @@ idx_t SyncIOBackend::SubmitRequest(IORequest *request) {
 		int err = xnvme_nvm_read(&ctx, geometry.device_ns_id, lba_location, lba_count - 1, fs_buffer, nullptr);
 		if (err) {
 			xnvme_cli_perr("Could not read from device with xnvme_nvme_read(): ", err);
-			throw IOException("Encountered error when reading from NVMe device");
+			return 1;
 		}
 	} else {
 
 		int err = xnvme_nvm_write(&ctx, geometry.device_ns_id, lba_location, lba_count - 1, fs_buffer, nullptr);
 		if (err) {
 			xnvme_cli_perr("Could not write to device with xnvme_nvme_write(): ", err);
-			throw IOException("Encountered error when writing to NVMe device");
+			return 1;
 		}
 	}
+
+	return 0;
 }
 
 void SyncIOBackend::Sync() {
