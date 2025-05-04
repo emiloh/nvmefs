@@ -193,7 +193,7 @@ void AsyncIOBackend::ProcessRequestFromQueue(idx_t max_items) {
 		idx_t lba_count = request->GetLBACount();
 
 		// Set the command context
-		xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, &request);
+		xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, request);
 
 		// Prepare the command
 		int err = 0; // If successful, ret will be 0
@@ -241,12 +241,13 @@ void AsyncIOBackend::RequestCallback(xnvme_cmd_ctx *ctx, void *data) {
 	AsyncIORequest *request = static_cast<AsyncIORequest *>(data);
 
 	if (xnvme_cmd_ctx_cpl_status(ctx)) {
+		xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
 		request->Failed();
 		return;
 	}
 
-	request->Success();
 	xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+	request->Success();
 }
 
 } // namespace duckdb
