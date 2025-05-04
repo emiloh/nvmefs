@@ -69,7 +69,7 @@ std::recursive_mutex NvmeFileSystem::api_lock;
 
 NvmeFileSystem::NvmeFileSystem(NvmeConfig config)
     : allocator(Allocator::DefaultAllocator()),
-      device(make_uniq<XNVMeDevice>(config.device_path, config.plhdls, config.backend, config.async)),
+      device(make_uniq<NvmeDevice>(config.device_path, config.plhdls, config.backend, config.async)),
       max_temp_size(config.max_temp_size), max_wal_size(config.max_wal_size) {
 }
 
