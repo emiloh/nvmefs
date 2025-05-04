@@ -53,7 +53,7 @@ public:
 class AsyncIORequest : public IORequest {
 public:
 	AsyncIORequest(RequestOptions opts, RequestType type)
-	    : IORequest(opts, type), promise(make_uniq<std::promise<bool>>()), future(promise->get_future()) {
+	    : IORequest(opts, type), promise(), future(promise.get_future()) {
 		// Constructor implementation
 	}
 
@@ -66,7 +66,7 @@ public:
 	bool WaitForCompletion() override;
 
 private:
-	unique_ptr<std::promise<bool>> promise;
+	std::promise<bool> promise;
 	std::future<bool> future;
 };
 

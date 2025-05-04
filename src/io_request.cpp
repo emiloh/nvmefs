@@ -40,11 +40,11 @@ bool SyncIORequest::WaitForCompletion() {
 }
 
 void AsyncIORequest::Failed() {
-	promise->set_value(false);
+	promise.set_value(false);
 }
 
 void AsyncIORequest::Success() {
-	promise->set_value(true);
+	promise.set_value(true);
 }
 
 bool AsyncIORequest::WaitForCompletion() {
