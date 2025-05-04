@@ -16,6 +16,9 @@ XNVMeDevice::XNVMeDevice(const string &device_path, const idx_t placement_handle
 	allocated_placement_identifiers["nvmefs:///tmp"] = 1;
 }
 
+XNVMeDevice::~XNVMeDevice() {
+}
+
 DeviceGeometry XNVMeDevice::GetDeviceGeometry() {
 	DeviceGeometry geometry;
 
@@ -48,7 +51,7 @@ idx_t XNVMeDevice::Read(void *buffer, const CmdContext &context) {
 	unique_ptr<IORequest> req =
 	    backend->CreateReadRequest(context.start_lba, context.nr_lbas, plid_idx, backend_buffer);
 
-	if (!backend->SubmitRequest(*req)) {
+	if (!backend->SubmitRequest(req.get())) {
 		backend->FreeBuffer(backend_buffer);
 		throw InternalException("Failed to submit read request");
 	}
@@ -83,7 +86,7 @@ idx_t XNVMeDevice::Write(void *buffer, const CmdContext &context) {
 	unique_ptr<IORequest> req =
 	    backend->CreateWriteRequest(context.start_lba, context.nr_lbas, plid_idx, backend_buffer);
 
-	if (!backend->SubmitRequest(*req)) {
+	if (!backend->SubmitRequest(req.get())) {
 		backend->FreeBuffer(backend_buffer);
 		throw InternalException("Failed to submit read request");
 	}

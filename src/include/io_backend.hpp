@@ -6,8 +6,6 @@
 
 namespace duckdb {
 
-typedef void *backend_buf_ptr;
-
 struct BackendGeometry {
 	idx_t lba_size;
 	idx_t lba_count;
@@ -38,13 +36,13 @@ public:
 		geometry.plhdls = placement_handles;
 	}
 
-	virtual ~IOBackend() = default;
+	virtual ~IOBackend();
 
 	/// @brief Submits an IO request to the backend. This function may be blocking until the request is actually
 	/// submitted.
 	/// @param request The request to be submitted.
 	/// @return The number of LBA blocks that were submitted.
-	virtual idx_t SubmitRequest(IORequest &request) = 0;
+	virtual idx_t SubmitRequest(IORequest *request) = 0;
 
 	virtual unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                                backend_buf_ptr buffer);
@@ -75,7 +73,7 @@ public:
 	}
 
 protected:
-	virtual string GetName();
+	virtual string GetName() = 0;
 
 protected:
 	xnvme_dev *device;
@@ -103,7 +101,7 @@ class SyncIOBackend : public IOBackend {
 public:
 	SyncIOBackend(const string &device_path, const idx_t placement_handles, const string &backend);
 
-	idx_t SubmitRequest(IORequest &request) override;
+	idx_t SubmitRequest(IORequest *request) override;
 
 	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                        backend_buf_ptr buffer) override;
@@ -121,8 +119,9 @@ protected:
 class AsyncIOBackend : public IOBackend {
 public:
 	AsyncIOBackend(const string &device_path, const idx_t placement_handles, const string &backend);
+	~AsyncIOBackend();
 
-	idx_t SubmitRequest(IORequest &request) override;
+	idx_t SubmitRequest(IORequest *request) override;
 
 	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                        backend_buf_ptr buffer) override;
@@ -146,7 +145,7 @@ private:
 	static void RequestCallback(xnvme_cmd_ctx *ctx, void *data);
 
 private:
-	duckdb_moodycamel::ConcurrentQueue<AsyncIORequest &> request_queue;
+	duckdb_moodycamel::ConcurrentQueue<AsyncIORequest *> request_queue;
 	std::thread event_loop_thread;
 	std::atomic<bool> stop_event_loop;
 	std::atomic<bool> sync_io_requests;

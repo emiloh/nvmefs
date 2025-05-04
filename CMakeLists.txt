@@ -16,6 +16,7 @@ set(EXTENSION_SOURCES
   src/nvmefs_config.cpp
   src/device.cpp
   src/nvme_device.cpp
+  src/io_request.cpp
   src/io_backend.cpp
   src/xnvme_device.cpp)
 

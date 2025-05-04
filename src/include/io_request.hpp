@@ -7,6 +7,8 @@ namespace duckdb {
 
 enum RequestType { READ, WRITE };
 
+typedef void *backend_buf_ptr;
+
 struct RequestOptions {
 
 	// Offset in a block of an lba to read/write
@@ -24,33 +26,13 @@ public:
 
 	virtual bool WaitForCompletion();
 
-	backend_buf_ptr GetBuffer() {
-		return options.buffer;
-	}
-
-	idx_t GetBufferSizeInBytes() {
-		return options.lba_count * options.lba_size;
-	}
-
-	idx_t GetLBALocation() {
-		return options.lba_location;
-	}
-
-	idx_t GetLBACount() {
-		return options.lba_count;
-	}
-
-	uint8_t GetFDPPlacementIndex() {
-		return options.fdp_placement_index;
-	}
-
-	bool IsRead() {
-		return type == RequestType::READ;
-	}
-
-	bool IsWrite() {
-		return type == RequestType::WRITE;
-	}
+	backend_buf_ptr GetBuffer();
+	idx_t GetBufferSizeInBytes();
+	idx_t GetLBALocation();
+	idx_t GetLBACount();
+	uint8_t GetFDPPlacementIndex();
+	bool IsRead();
+	bool IsWrite();
 
 private:
 	RequestOptions options;
@@ -65,10 +47,7 @@ public:
 
 	/// @brief Just returns true. Assumes that if an error has happend it was at the submission of the request.
 	/// @return True
-	bool WaitForCompletion() override {
-		// Implementation for synchronous request completion
-		return true;
-	}
+	bool WaitForCompletion() override;
 };
 
 class AsyncIORequest : public IORequest {
@@ -78,22 +57,13 @@ public:
 		// Constructor implementation
 	}
 
-	void Failed() {
-		// Set the promise to indicate failure
-		promise->set_value(false);
-	}
+	void Failed();
 
-	void Success() {
-		// Set the promise to indicate success
-		promise->set_value(true);
-	}
+	void Success();
 
 	/// @brief Waits for the request to complete. This is a blocking call.
 	/// @return true if the request completed successfully, false otherwise
-	bool WaitForCompletion() override {
-		// Implementation for asynchronous request completion
-		return future.get();
-	}
+	bool WaitForCompletion() override;
 
 private:
 	unique_ptr<std::promise<bool>> promise;

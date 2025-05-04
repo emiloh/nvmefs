@@ -6,7 +6,7 @@ IOBackend::~IOBackend() {
 	xnvme_dev_close(device);
 }
 
-idx_t IOBackend::SubmitRequest(IORequest &request) {
+idx_t IOBackend::SubmitRequest(IORequest *request) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
@@ -33,30 +33,39 @@ SyncIOBackend::SyncIOBackend(const string &device_path, const idx_t placement_ha
 	// Initialize the device
 }
 
-SyncIOBackend::~SyncIOBackend() {
-	// Cleanup resources
-}
-
 unique_ptr<IORequest> SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                        backend_buf_ptr buffer) {
+	RequestOptions opts;
+	opts.fdp_placement_index = plid;
+	opts.lba_location = lba_location;
+	opts.lba_size = geometry.lba_size;
+	opts.lba_count = nr_lbas;
+	opts.buffer = buffer;
 
-	return make_uniq<SyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
+	return make_uniq<SyncIORequest>(opts, RequestType::READ);
 }
 
 unique_ptr<IORequest> SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                         backend_buf_ptr buffer) {
 
-	return make_uniq<SyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
+	RequestOptions opts;
+	opts.fdp_placement_index = plid;
+	opts.lba_location = lba_location;
+	opts.lba_size = geometry.lba_size;
+	opts.lba_count = nr_lbas;
+	opts.buffer = buffer;
+
+	return make_uniq<SyncIORequest>(opts, RequestType::WRITE);
 }
 
-idx_t SyncIOBackend::SubmitRequest(IORequest &request) {
+idx_t SyncIOBackend::SubmitRequest(IORequest *request) {
 	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(device);
 
-	idx_t lba_location = request.GetLBALocation();
-	idx_t lba_count = request.GetLBACount();
-	backend_buf_ptr fs_buffer = request.GetBuffer();
+	idx_t lba_location = request->GetLBALocation();
+	idx_t lba_count = request->GetLBACount();
+	backend_buf_ptr fs_buffer = request->GetBuffer();
 
-	if (request.IsRead()) {
+	if (request->IsRead()) {
 		int err = xnvme_nvm_read(&ctx, geometry.device_ns_id, lba_location, lba_count - 1, fs_buffer, nullptr);
 		if (err) {
 			xnvme_cli_perr("Could not read from device with xnvme_nvme_read(): ", err);
@@ -70,6 +79,9 @@ idx_t SyncIOBackend::SubmitRequest(IORequest &request) {
 			throw IOException("Encountered error when writing to NVMe device");
 		}
 	}
+}
+
+void SyncIOBackend::Sync() {
 }
 
 /**********************
@@ -88,20 +100,37 @@ AsyncIOBackend::AsyncIOBackend(const string &device_path, const idx_t placement_
 AsyncIOBackend::~AsyncIOBackend() {
 	StopEventLoop();
 	// TODO: Stop the event loop and cleanup the queue
+	xnvme_queue_term(queue);
 }
 
 unique_ptr<IORequest> AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                         backend_buf_ptr buffer) {
-	return make_uniq<AsyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::READ);
+
+	RequestOptions opts;
+	opts.fdp_placement_index = plid;
+	opts.lba_location = lba_location;
+	opts.lba_size = geometry.lba_size;
+	opts.lba_count = nr_lbas;
+	opts.buffer = buffer;
+
+	return make_uniq<AsyncIORequest>(opts, RequestType::READ);
 }
 
 unique_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                          backend_buf_ptr buffer) {
-	return make_uniq<AsyncIORequest>(lba_location, geometry.lba_size, nr_lbas, buffer, RequestType::WRITE);
+
+	RequestOptions opts;
+	opts.fdp_placement_index = plid;
+	opts.lba_location = lba_location;
+	opts.lba_size = geometry.lba_size;
+	opts.lba_count = nr_lbas;
+	opts.buffer = buffer;
+
+	return make_uniq<AsyncIORequest>(opts, RequestType::WRITE);
 }
 
-idx_t AsyncIOBackend::SubmitRequest(IORequest &request) {
-	AsyncIORequest &async_request = static_cast<AsyncIORequest &>(request);
+idx_t AsyncIOBackend::SubmitRequest(IORequest *request) {
+	AsyncIORequest *async_request = static_cast<AsyncIORequest *>(request);
 	request_queue.enqueue(async_request);
 
 	return 0;
