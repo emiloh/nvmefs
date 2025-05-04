@@ -11,11 +11,6 @@ class NvmeDeviceNamespace:
         self.block_size = 4096
         self.device_id = int(device_path[-1])
 
-        # TODO: Document environment variables in readme
-        self.log_id = log_id
-        self.sent_offset = sent_offset
-        self.written_offset = written_offset
-
         self.number_of_blocks = number_of_blocks
 
     def delete(self):
@@ -68,9 +63,6 @@ class NvmeDevice:
         self.base_device_path = device_path
         self.block_size = 4096
         self.device_id = int(device_path[-1])
-
-        if self.log_id is None :
-            raise Exception("Environment variable LOGIDWAF")
 
         self.number_of_blocks = self.__get_device_info(device_path)
     
