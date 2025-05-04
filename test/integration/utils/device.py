@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 class NvmeDeviceNamespace:
-    def __init__(self, device_path: str, namespace_id: int, number_of_blocks: int, log_id: str, sent_offset: list[int], written_offset:list[int], is_mounted: bool = False):
+    def __init__(self, device_path: str, namespace_id: int, number_of_blocks: int, is_mounted: bool = False):
         self.base_device_path = device_path
         self.namespace_id = namespace_id
         self.is_mounted = is_mounted
@@ -68,11 +68,6 @@ class NvmeDevice:
         self.base_device_path = device_path
         self.block_size = 4096
         self.device_id = int(device_path[-1])
-
-        # TODO: Document environment variables in readme
-        self.log_id = os.getenv("LOGIDWAF")
-        self.sent_offset = list(map(int,os.getenv("SENT_OFFSET").split("-")))
-        self.written_offset = list(map(int, os.getenv("WRITTEN_OFFSET").split("-")))
 
         if self.log_id is None :
             raise Exception("Environment variable LOGIDWAF")
@@ -182,7 +177,7 @@ class NvmeDevice:
             raise Exception("Failed to attach namespace")
         
         is_mounted = mount_path is not None
-        new_namespace = NvmeDeviceNamespace(device_path, namespace_id, ns_number_of_blocks, self.log_id, self.sent_offset, self.written_offset, is_mounted)
+        new_namespace = NvmeDeviceNamespace(device_path, namespace_id, ns_number_of_blocks, is_mounted)
         self.namespaces.append(new_namespace)
 
         if is_mounted:
@@ -194,23 +189,6 @@ class NvmeDevice:
         
         return new_namespace
 
-    def get_written_bytes_nsid(self, namespace_id: int):
-        for namespace in self.namespaces:
-            if namespace.namespace_id == namespace_id:
-                return namespace.get_written_bytes()
-
-        raise Exception(f"Namespace {namespace_id} not found")
-
-    def get_written_bytes(self):
-        cmd = f"""nvme get-log {self.base_device_path} --log-id={self.log_id} --log-len=512 -b"""
-        res = subprocess.check_output(cmd, shell=True)
-        host_written = int.from_bytes(res[self.sent_offset[0]:self.sent_offset[1]+1], byteorder="little") 
-        media_written = int.from_bytes(res[self.written_offset[0]:self.written_offset[1]+1], byteorder="little") 
-
-        if host_written == 0: return (0,0)
-
-        return (host_written, media_written)
-
     def reset(self):
         """
         Reset the device by deleting all namespaces and unmounting mounted namespaces
@@ -219,15 +197,6 @@ class NvmeDevice:
         for namespace in self.namespaces:
             namespace.deallocate_blocks()
             namespace.delete()
-
-def calculate_waf(host_written_bytes, media_written_bytes):
-    """
-    Calculates the Write Amplification Factor (WAF) based on host and media written bytes
-    """
-    if host_written_bytes == 0:
-        return 0
-
-    return media_written_bytes / host_written_bytes
 
 def setup_device(device: NvmeDevice, namespace_id:int = 1, enable_fdp: bool = False, mount_path: str = None) -> NvmeDeviceNamespace:
     """
