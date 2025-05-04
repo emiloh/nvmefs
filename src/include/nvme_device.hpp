@@ -7,6 +7,7 @@
 #include <mutex>
 #include <future>
 #include <chrono>
+#include "io_backend.hpp"
 
 namespace duckdb {
 
@@ -58,52 +59,16 @@ private:
 	/// @return A placement identifier
 	uint8_t GetPlacementIdentifierOrDefault(const string &path);
 
-	/// @brief Allocates a device specific buffer. Should be freed with FreeDeviceBuffer.
-	/// @param nr_bytes The number of bytes to allocate (The allocated buffer mighr be larger)
-	/// @return Pointer to allocated device buffer
-	nvme_buf_ptr AllocateDeviceBuffer(idx_t nr_bytes);
-
-	/// @brief Frees the given device buffer
-	/// @param buffer The device buffer to free
-	void FreeDeviceBuffer(nvme_buf_ptr buffer);
-
 	/// @brief Loads the geometry of the decvice
 	/// @return The device geometry
 	DeviceGeometry LoadDeviceGeometry();
 
-	/// @brief Prepares a xnvme command context for issuing a write agasint the device
-	/// @param plid_idx The index of the placement identifier to use
-	/// @return A xnvme command context
-	xnvme_cmd_ctx PrepareWriteContext(idx_t plid_idx);
-
-	/// @brief Prepares a xnvme command context for issuing a read agasint the device
-	/// @param plid_idx The index of the placement identifier to use
-	/// @return A xnvme command context
-	xnvme_cmd_ctx PrepareReadContext(idx_t plid_idx);
-
-	/// @brief Specifies the backend and sync/async used for the device
-	/// @param opts xNVMe options
-	void PrepareOpts(xnvme_opts &opts);
-
-	static void CommandCallback(struct xnvme_cmd_ctx *ctx, void *cb_args);
-
-	idx_t ReadAsync(void *buffer, const CmdContext &context);
-	idx_t WriteAsync(void *buffer, const CmdContext &context);
-
-	void PrepareAsyncReadContext(xnvme_cmd_ctx &ctx, idx_t plid_idx);
-	void PrepareAsyncWriteContext(xnvme_cmd_ctx &ctx, idx_t plid_idx);
-
-
 private:
 	map<string, uint8_t> allocated_placement_identifiers;
-	xnvme_dev *device;
-	xnvme_queue *queue;
+	unique_ptr<IOBackend> backend;
 	const string dev_path;
 	const idx_t plhdls;
 	DeviceGeometry geometry;
-	const string backend;
-	const bool async;
-	static std::recursive_mutex queue_lock;
 };
 
 } // namespace duckdb
