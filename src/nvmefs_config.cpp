@@ -63,7 +63,7 @@ NvmeConfig NvmeConfigManager::LoadConfig(DatabaseInstance &instance) {
 	string backend;
 	int64_t plhdls = 0;
 	// TODO: ensure that we always have value here. It is possible to not have value
-	idx_t max_temp_size = 1ULL << 30; // 1 GiB
+	idx_t max_temp_size = 76ULL << 30; // ~76 GiB
 	if (config.options.maximum_swap_space != DConstants::INVALID_INDEX) {
 		max_temp_size = static_cast<idx_t>(config.options.maximum_swap_space);
 	}
