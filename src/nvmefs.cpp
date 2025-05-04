@@ -1,6 +1,5 @@
 #include "nvmefs.hpp"
 #include "nvme_device.hpp"
-#include "xnvme_device.hpp"
 
 namespace duckdb {
 NvmeFileHandle::NvmeFileHandle(FileSystem &file_system, string path, FileOpenFlags flags)
