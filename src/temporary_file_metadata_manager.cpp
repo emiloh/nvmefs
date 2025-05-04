@@ -139,3 +139,4 @@ void TemporaryFileMetadataManager::ListFiles(const string &directory,
 		callback(StringUtil::GetFileName(kv.first), false);
 	}
 }
+} // namespace duckdb
