@@ -145,7 +145,7 @@ private:
 	static void RequestCallback(xnvme_cmd_ctx *ctx, void *data);
 
 private:
-	moodycamel::ConcurrentQueue<AsyncIORequest *> request_queue;
+	duckdb_moodycamel::ConcurrentQueue<AsyncIORequest *> request_queue;
 	std::thread event_loop_thread;
 	std::atomic<bool> stop_event_loop;
 	std::atomic<bool> sync_io_requests;
