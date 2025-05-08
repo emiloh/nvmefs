@@ -1,7 +1,4 @@
 #include "io_backend.hpp"
-#include <memory>
-#include <thread>
-#include <iostream>
 
 namespace duckdb {
 
@@ -9,16 +6,16 @@ IOBackend::~IOBackend() {
 	xnvme_dev_close(device);
 }
 
-idx_t IOBackend::SubmitRequest(shared_ptr<IORequest> request) {
+idx_t IOBackend::SubmitRequest(IORequest *request) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
-shared_ptr<IORequest> IOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+unique_ptr<IORequest> IOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                    backend_buf_ptr buffer) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
 
-shared_ptr<IORequest> IOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+unique_ptr<IORequest> IOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                     backend_buf_ptr buffer) {
 	throw NotImplementedException("%s: SubmitRequest is not implemented", GetName());
 }
@@ -36,7 +33,7 @@ SyncIOBackend::SyncIOBackend(const string &device_path, const idx_t placement_ha
 	// Initialize the device
 }
 
-shared_ptr<IORequest> SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+unique_ptr<IORequest> SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                        backend_buf_ptr buffer) {
 	RequestOptions opts;
 	opts.fdp_placement_index = plid;
@@ -45,10 +42,10 @@ shared_ptr<IORequest> SyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t
 	opts.lba_count = nr_lbas;
 	opts.buffer = buffer;
 
-	return make_shared_ptr<SyncIORequest>(opts, RequestType::READ);
+	return make_uniq<SyncIORequest>(opts, RequestType::READ);
 }
 
-shared_ptr<IORequest> SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+unique_ptr<IORequest> SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                         backend_buf_ptr buffer) {
 
 	RequestOptions opts;
@@ -58,10 +55,10 @@ shared_ptr<IORequest> SyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_
 	opts.lba_count = nr_lbas;
 	opts.buffer = buffer;
 
-	return make_shared_ptr<SyncIORequest>(opts, RequestType::WRITE);
+	return make_uniq<SyncIORequest>(opts, RequestType::WRITE);
 }
 
-idx_t SyncIOBackend::SubmitRequest(shared_ptr<IORequest> request) {
+idx_t SyncIOBackend::SubmitRequest(IORequest *request) {
 	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(device);
 
 	idx_t lba_location = request->GetLBALocation();
@@ -112,7 +109,7 @@ AsyncIOBackend::~AsyncIOBackend() {
 	xnvme_queue_term(queue);
 }
 
-shared_ptr<IORequest> AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+unique_ptr<IORequest> AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                         backend_buf_ptr buffer) {
 
 	RequestOptions opts;
@@ -122,10 +119,10 @@ shared_ptr<IORequest> AsyncIOBackend::CreateReadRequest(idx_t lba_location, idx_
 	opts.lba_count = nr_lbas;
 	opts.buffer = buffer;
 
-	return make_shared_ptr<AsyncIORequest>(opts, RequestType::READ);
+	return make_uniq<AsyncIORequest>(opts, RequestType::READ);
 }
 
-shared_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+unique_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
                                                          backend_buf_ptr buffer) {
 
 	RequestOptions opts;
@@ -135,11 +132,11 @@ shared_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx
 	opts.lba_count = nr_lbas;
 	opts.buffer = buffer;
 
-	return make_shared_ptr<AsyncIORequest>(opts, RequestType::WRITE);
+	return make_uniq<AsyncIORequest>(opts, RequestType::WRITE);
 }
 
-idx_t AsyncIOBackend::SubmitRequest(duckdb::shared_ptr<IORequest> request) {
-	duckdb::shared_ptr<AsyncIORequest> async_request = shared_ptr_cast<AsyncIORequest>(request);
+idx_t AsyncIOBackend::SubmitRequest(IORequest *request) {
+	AsyncIORequest *async_request = std::static_pointer_cast<AsyncIORequest>(request);
 	request_queue.enqueue(async_request);
 
 	return 0;
@@ -184,11 +181,11 @@ void AsyncIOBackend::StopEventLoop() {
 
 void AsyncIOBackend::ProcessRequestFromQueue(idx_t max_items) {
 	// Process requests from the queue
-	shared_ptr<AsyncIORequest> requests[8];
+	AsyncIORequest *requests[8];
 	size_t nr_dequeued_items = request_queue.try_dequeue_bulk(requests, max_items);
 
 	for (size_t i = 0; i < nr_dequeued_items; i++) {
-		shared_ptr<AsyncIORequest> request = requests[i];
+		AsyncIORequest *request = requests[i];
 		xnvme_cmd_ctx *xnvme_ctx = xnvme_queue_get_cmd_ctx(queue);
 		PrepareRequest(xnvme_ctx, *request);
 
@@ -196,7 +193,7 @@ void AsyncIOBackend::ProcessRequestFromQueue(idx_t max_items) {
 		idx_t lba_count = request->GetLBACount();
 
 		// Set the command context
-		xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, request.get());
+		xnvme_cmd_ctx_set_cb(xnvme_ctx, RequestCallback, request);
 
 		// Prepare the command
 		int err = 0; // If successful, ret will be 0

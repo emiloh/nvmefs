@@ -42,11 +42,11 @@ public:
 	/// submitted.
 	/// @param request The request to be submitted.
 	/// @return The number of LBA blocks that were submitted.
-	virtual idx_t SubmitRequest(shared_ptr<IORequest> request) = 0;
+	virtual idx_t SubmitRequest(IORequest *request) = 0;
 
-	virtual shared_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	virtual unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                                backend_buf_ptr buffer);
-	virtual shared_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	virtual unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                                 backend_buf_ptr buffer);
 
 	virtual void Sync();
@@ -101,11 +101,11 @@ class SyncIOBackend : public IOBackend {
 public:
 	SyncIOBackend(const string &device_path, const idx_t placement_handles, const string &backend);
 
-	idx_t SubmitRequest(shared_ptr<IORequest> request) override;
+	idx_t SubmitRequest(IORequest *request) override;
 
-	shared_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                        backend_buf_ptr buffer) override;
-	shared_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                         backend_buf_ptr buffer) override;
 
 	void Sync() override;
@@ -121,11 +121,11 @@ public:
 	AsyncIOBackend(const string &device_path, const idx_t placement_handles, const string &backend);
 	~AsyncIOBackend();
 
-	idx_t SubmitRequest(shared_ptr<IORequest> request) override;
+	idx_t SubmitRequest(IORequest *request) override;
 
-	shared_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	unique_ptr<IORequest> CreateReadRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                        backend_buf_ptr buffer) override;
-	shared_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
+	unique_ptr<IORequest> CreateWriteRequest(idx_t lba_location, idx_t nr_lbas, uint8_t plid,
 	                                         backend_buf_ptr buffer) override;
 
 	void Sync() override; // TODO: How are we going to sync the async requests?
@@ -145,7 +145,7 @@ private:
 	static void RequestCallback(xnvme_cmd_ctx *ctx, void *data);
 
 private:
-	duckdb_moodycamel::ConcurrentQueue<shared_ptr<AsyncIORequest>> request_queue;
+	moodycamel::ConcurrentQueue<AsyncIORequest *> request_queue;
 	std::thread event_loop_thread;
 	std::atomic<bool> stop_event_loop;
 	std::atomic<bool> sync_io_requests;
