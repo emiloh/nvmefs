@@ -37,8 +37,8 @@ idx_t NvmeDevice::Write(void *buffer, const CmdContext &context) {
 	memcpy(dev_buffer, (char *)buffer + ctx.offset, ctx.nr_bytes);
 	uint8_t plid_idx = GetPlacementIdentifierOrDefault(ctx.filepath);
 
-	unique_ptr<IORequest> req = backend->CreateWriteRequest(ctx.start_lba, ctx.nr_lbas, plid_idx, dev_buffer);
-	int err = backend->SubmitRequest(req.get());
+	shared_ptr<IORequest> req = backend->CreateWriteRequest(ctx.start_lba, ctx.nr_lbas, plid_idx, dev_buffer);
+	int err = backend->SubmitRequest(req);
 	if (err) {
 		backend->FreeBuffer(dev_buffer);
 		throw InternalException("Failed to submit write request");
@@ -64,9 +64,9 @@ idx_t NvmeDevice::Read(void *buffer, const CmdContext &context) {
 	backend_buf_ptr dev_buffer = backend->AllocateBuffer(ctx.nr_bytes);
 	uint8_t plid_idx = GetPlacementIdentifierOrDefault(ctx.filepath);
 
-	unique_ptr<IORequest> req = backend->CreateReadRequest(ctx.start_lba, ctx.nr_lbas, plid_idx, dev_buffer);
+	shared_ptr<IORequest> req = backend->CreateReadRequest(ctx.start_lba, ctx.nr_lbas, plid_idx, dev_buffer);
 
-	int err = backend->SubmitRequest(req.get());
+	int err = backend->SubmitRequest(req);
 	if (err) {
 		backend->FreeBuffer(dev_buffer);
 		throw InternalException("Failed to submit read request");

@@ -37,6 +37,7 @@ public:
 private:
 	RequestOptions options;
 	RequestType type;
+	std::mutex buffer_mutex;
 };
 
 class SyncIORequest : public IORequest {

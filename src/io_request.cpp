@@ -3,6 +3,7 @@
 namespace duckdb {
 
 backend_buf_ptr IORequest::GetBuffer() {
+	std::lock_guard<std::mutex> lock(buffer_mutex);
 	return options.buffer;
 }
 
