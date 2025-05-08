@@ -136,7 +136,7 @@ unique_ptr<IORequest> AsyncIOBackend::CreateWriteRequest(idx_t lba_location, idx
 }
 
 idx_t AsyncIOBackend::SubmitRequest(IORequest *request) {
-	AsyncIORequest *async_request = std::static_pointer_cast<AsyncIORequest>(request);
+	AsyncIORequest *async_request = static_cast<AsyncIORequest *>(request);
 	request_queue.enqueue(async_request);
 
 	return 0;
