@@ -32,8 +32,8 @@ protected:
 		NvmeConfig testConfig {
 		    .device_path = "/dev/ng1n1",
 		    .plhdls = 8,
-		    .max_temp_size = page_size * 10, // 10 pages = 640 blocks
-		    .max_wal_size = 1ULL << 25       // 32 MiB
+		    .max_temp_size = 32000 * block_size + 64000 * block_size,
+		    .max_wal_size = 1ULL << 25 // 32 MiB
 		};
 
 		file_system = make_uniq<NvmeFileSystem>(testConfig, make_uniq<FakeDevice>(lba_count)); // 1 GiB
@@ -119,18 +119,20 @@ TEST_F(DiskInteractionTest, FileExistsReturnFalseWhenTemporaryFileDoNotExists) {
 }
 
 TEST_F(DiskInteractionTest, FileExistsReturnTrueWhenTemporaryFileExists) {
-	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE;
+	FileOpenFlags flags =
+	    FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 	unique_ptr<FileHandle> fh = file_system->OpenFile("nvmefs://test.db", flags);
 
 	// Write something to create file
 	string hello = "hello temp";
 	vector<char> hello_buf {hello.begin(), hello.end()};
 	int bytes_to_read_write = hello.size();
-	fh = file_system->OpenFile("nvmefs:///tmp/file", flags);
+	string tmp_file_path = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
+	fh = file_system->OpenFile(tmp_file_path, flags);
 	fh->Write(hello_buf.data(), bytes_to_read_write);
 
 	// Check if it exists
-	bool exists = file_system->FileExists("nvmefs:///tmp/file");
+	bool exists = file_system->FileExists(tmp_file_path);
 	EXPECT_TRUE(exists);
 
 	// Read back data
@@ -183,13 +185,16 @@ TEST_F(DiskInteractionTest, GetFileSizeWALWithNoEntriesReturnZeroBytes) {
 }
 
 TEST_F(DiskInteractionTest, GetFileSizeOpensTwoTemporaryFileReturnCorrectSizes) {
-	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE;
+	FileOpenFlags flags =
+	    FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 	unique_ptr<FileHandle> fh = file_system->OpenFile("nvmefs://test.db", flags);
 	DeviceGeometry geo = file_system->GetDevice().GetDeviceGeometry();
 
 	// Open two temporary files, write to the second
-	unique_ptr<FileHandle> tmp_fh_1 = file_system->OpenFile("nvmefs:///tmp/file1", flags);
-	unique_ptr<FileHandle> tmp_fh_2 = file_system->OpenFile("nvmefs:///tmp/file2", flags);
+	string tmp_file_path1 = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
+	string tmp_file_path2 = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S64k", 0);
+	unique_ptr<FileHandle> tmp_fh_1 = file_system->OpenFile(tmp_file_path1, flags);
+	unique_ptr<FileHandle> tmp_fh_2 = file_system->OpenFile(tmp_file_path2, flags);
 
 	vector<char> buf_h {'H', 'E', 'L', 'L', 'O'};
 	tmp_fh_2->Write(buf_h.data(), buf_h.size(), geo.lba_size * 0);
@@ -215,11 +220,12 @@ TEST_F(DiskInteractionTest, DirectoryExistsMetadataLoadedReturnsTrue) {
 }
 
 TEST_F(DiskInteractionTest, RemoveDirectoryGivenTemporyDirectoyRemovesSuccessfully) {
-	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE;
+	FileOpenFlags flags =
+	    FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 	unique_ptr<FileHandle> fh = file_system->OpenFile("nvmefs://test.db", flags);
 
 	// Write a file to temporary folder
-	string temp_filename = "nvmefs:///tmp/file";
+	string temp_filename = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
 	vector<char> buf {'H', 'E', 'L', 'L', 'O'};
 	fh = file_system->OpenFile(temp_filename, flags);
 	fh->Write(buf.data(), buf.size());
@@ -287,11 +293,13 @@ TEST_F(DiskInteractionTest, RemoveFileGivenWALRemovesWALData) {
 }
 
 TEST_F(DiskInteractionTest, RemoveFileGivenValidTempFileRemovesIt) {
-	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE;
+	FileOpenFlags flags =
+	    FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 	unique_ptr<FileHandle> fh = file_system->OpenFile("nvmefs://test.db", flags);
 
 	// Write temporary file
-	string temp_filename = "nvmefs:///tmp/file";
+
+	string temp_filename = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
 	vector<char> buf {'H', 'E', 'L', 'L', 'O'};
 	fh = file_system->OpenFile(temp_filename, flags);
 	fh->Write(buf.data(), buf.size());
@@ -366,18 +374,17 @@ TEST_F(DiskInteractionTest, WriteAndReadDataDoesNotOverlapOtherCategories) {
 	// Create a file
 	string file_path = "nvmefs://test.db";
 	string wal_file_path = "nvmefs://test.db.wal";
-	string tmp_file_path =
-	    StringUtil::Format("nvmefs://test.db/tmp/duckdb_temp_storage_%d-%llu.tmp", DEFAULT_BLOCK_ALLOC_SIZE, 0);
-	unique_ptr<FileHandle> db_file =
-	    file_system->OpenFile(file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
+	string tmp_file_path = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "DEFAULT", 0);
+	unique_ptr<FileHandle> db_file = file_system->OpenFile(
+	    file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ | FileFlags::FILE_FLAGS_FILE_CREATE);
 	ASSERT_TRUE(db_file != nullptr);
 
-	unique_ptr<FileHandle> wal_file =
-	    file_system->OpenFile(wal_file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
+	unique_ptr<FileHandle> wal_file = file_system->OpenFile(
+	    wal_file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ | FileFlags::FILE_FLAGS_FILE_CREATE);
 	ASSERT_TRUE(wal_file != nullptr);
 
-	unique_ptr<FileHandle> tmp_file =
-	    file_system->OpenFile(tmp_file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
+	unique_ptr<FileHandle> tmp_file = file_system->OpenFile(
+	    tmp_file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ | FileFlags::FILE_FLAGS_FILE_CREATE);
 	ASSERT_TRUE(tmp_file != nullptr);
 
 	// Write some data to the db file
@@ -505,11 +512,10 @@ TEST_F(DiskInteractionTest, SeekOutOfTmpMetadataBounds) {
 	file_system->OpenFile("nvmefs://test.db", FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
 
 	// Create a file
-	string file_path =
-	    StringUtil::Format("nvmefs://test.db/tmp/duckdb_temp_storage_%d-%llu.tmp", DEFAULT_BLOCK_ALLOC_SIZE, 0);
+	string file_path = StringUtil::Format("nvmefs://test.db/tmp/duckdb_temp_storage_%s-%llu.tmp", "DEFAULT", 0);
 
-	unique_ptr<FileHandle> file =
-	    file_system->OpenFile(file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
+	unique_ptr<FileHandle> file = file_system->OpenFile(
+	    file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ | FileFlags::FILE_FLAGS_FILE_CREATE);
 	ASSERT_TRUE(file != nullptr);
 
 	// Attempt to seek out of bounds
@@ -623,8 +629,7 @@ TEST_F(DiskInteractionTest, WriteOutOfMetadataAssignedLBARangeForWALFileWithLoca
 
 TEST_F(DiskInteractionTest, WriteOutOfMetadataAssignedLBARangeForTmpFile) {
 	// Create a file
-	string file_path =
-	    StringUtil::Format("nvmefs://test.db/tmp/duckdb_temp_storage_%d-%llu.tmp", DEFAULT_BLOCK_ALLOC_SIZE, 0);
+	string file_path = StringUtil::Format("nvmefs://test.db/tmp/duckdb_temp_storage_%s-%llu.tmp", "DEFAULT", 0);
 
 	// Ensure that metadata is created
 	file_system->OpenFile("nvmefs://test.db", FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
@@ -671,19 +676,18 @@ TEST_F(DiskInteractionTest, TrimWrittenLocationInFileRemovesWrittenDataButKeepsS
 	string hello = "Hello, World!";
 	vector<char> data_ptr {hello.begin(), hello.end()};
 	int data_size = data_ptr.size();
-	file->Write(data_ptr.data(), data_size, page_size * 4); // Write data at the 16th byte of the device
+	file->Write(data_ptr.data(), data_size, page_size * 4);
 
 	// Read the data back
 	vector<char> buffer(data_size);
-	file->Read(buffer.data(), data_size, page_size * 4); // Read data from the 16th byte of the device
-
+	file->Read(buffer.data(), data_size, page_size * 4);
 	// Check that the data is correct
 	EXPECT_EQ(string(buffer.data(), data_size), hello);
 
 	file->Trim(page_size * 4, data_size);
 
 	memset(buffer.data(), 0, data_size);
-	file->Read(buffer.data(), data_size, page_size * 4); // Read data from the 16th byte of the device
+	file->Read(buffer.data(), data_size, page_size * 4);
 
 	// Check that the data is correct
 	EXPECT_NE(string(buffer.data(), data_size), hello);
@@ -727,18 +731,17 @@ TEST_F(DiskInteractionTest, TrimWrittenLocationInFileFromSeekPositionRemovesWrit
 
 TEST_F(DiskInteractionTest, WriteAndReadInsideTmpFile) {
 	// Create a file
-	string file_path =
-	    StringUtil::Format("nvmefs://test.db/tmp/duckdb_temp_storage_%d-%llu.tmp", DEFAULT_BLOCK_ALLOC_SIZE, 0);
+	string file_path = StringUtil::Format("nvmefs://test.db/tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
 
 	// Ensure that metadata is created
 	file_system->OpenFile("nvmefs://test.db", FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
 
-	unique_ptr<FileHandle> file =
-	    file_system->OpenFile(file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ);
+	unique_ptr<FileHandle> file = file_system->OpenFile(
+	    file_path, FileFlags::FILE_FLAGS_WRITE | FileFlags::FILE_FLAGS_READ | FileFlags::FILE_FLAGS_FILE_CREATE);
 	ASSERT_TRUE(file != nullptr);
 
 	// Attempt to write data out of range
-	int data_size = 4096 * 64; // One page
+	int data_size = 32768; // One page
 	char *data_ptr = new char[data_size];
 
 	for (int i = 0; i < 5; i++) {
@@ -811,12 +814,15 @@ TEST_F(DiskInteractionTest, ListFilesOfPrefixDirectoryYieldsCorrectFilesAndDirSt
 TEST_F(DiskInteractionTest, ListFilesOfTemporaryDirectoryWithFilesYieldCorrectListOfFiles) {
 	const string tmp_dir_filepath = "nvmefs:///tmp";
 
-	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE;
+	FileOpenFlags flags =
+	    FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 	unique_ptr<FileHandle> fh = file_system->OpenFile("nvmefs://test.db", flags);
 
 	// Open two temporary files, write to both and verify
-	unique_ptr<FileHandle> tmp_fh_1 = file_system->OpenFile("nvmefs:///tmp/file1", flags);
-	unique_ptr<FileHandle> tmp_fh_2 = file_system->OpenFile("nvmefs:///tmp/file2", flags);
+	string tmp_file_path1 = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
+	string tmp_file_path2 = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S64K", 0);
+	unique_ptr<FileHandle> tmp_fh_1 = file_system->OpenFile(tmp_file_path1, flags);
+	unique_ptr<FileHandle> tmp_fh_2 = file_system->OpenFile(tmp_file_path2, flags);
 
 	vector<char> buf_h {'H', 'E', 'L', 'L', 'O'};
 	tmp_fh_1->Write(buf_h.data(), buf_h.size(), 0);
@@ -839,7 +845,8 @@ TEST_F(DiskInteractionTest, ListFilesOfTemporaryDirectoryWithFilesYieldCorrectLi
 	bool dir = file_system->ListFiles(tmp_dir_filepath, lister);
 
 	EXPECT_EQ(dir, true);
-	EXPECT_THAT(results, UnorderedElementsAre(std::make_tuple("file1", false), std::make_tuple("file2", false)));
+	EXPECT_THAT(results, UnorderedElementsAre(std::make_tuple("duckdb_temp_storage_S32K-0.tmp", false),
+	                                          std::make_tuple("duckdb_temp_storage_S64K-0.tmp", false)));
 }
 
 TEST_F(DiskInteractionTest, ListFilesOfEmptyTemporaryDirectoryReturnsNothing) {
@@ -892,7 +899,8 @@ TEST_F(DiskInteractionTest, GetAvailableDiskSpaceDefaultDirWithNoAllocationRetur
 }
 
 TEST_F(DiskInteractionTest, GetAvailableDiskSpaceDefaultDirWritesInTmpAndWalReturnsCorrectSize) {
-	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE;
+	FileOpenFlags flags =
+	    FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 	unique_ptr<FileHandle> fh = file_system->OpenFile("nvmefs://test.db", flags);
 
 	DeviceGeometry geo = file_system->GetDevice().GetDeviceGeometry();
@@ -904,7 +912,8 @@ TEST_F(DiskInteractionTest, GetAvailableDiskSpaceDefaultDirWritesInTmpAndWalRetu
 	idx_t expected_size = (geo.lba_count * geo.lba_size) - (2 * geo.lba_size) - geo.lba_size - (4 * geo.lba_size);
 
 	// Allocate files and write to them
-	unique_ptr<FileHandle> tmp_fh = file_system->OpenFile("nvmefs:///tmp/test", flags);
+	string tmp_file_path1 = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
+	unique_ptr<FileHandle> tmp_fh = file_system->OpenFile(tmp_file_path1, flags);
 	unique_ptr<FileHandle> wal_fh = file_system->OpenFile("nvmefs://test.db.wal", flags);
 	vector<char> tmp_buf(2 * geo.lba_size);
 	vector<char> wal_buf(geo.lba_size);
@@ -920,15 +929,18 @@ TEST_F(DiskInteractionTest, GetAvailableDiskSpaceDefaultDirWritesInTmpAndWalRetu
 }
 
 TEST_F(DiskInteractionTest, GetAvailableDiskSpaceTmpDirectoryWithTwoFilesReturnCorrectSize) {
-	FileOpenFlags flags = FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE;
+	FileOpenFlags flags =
+	    FileOpenFlags::FILE_FLAGS_READ | FileOpenFlags::FILE_FLAGS_WRITE | FileOpenFlags::FILE_FLAGS_FILE_CREATE;
 	unique_ptr<FileHandle> fh = file_system->OpenFile("nvmefs://test.db", flags);
 
 	DeviceGeometry geo = file_system->GetDevice().GetDeviceGeometry();
 
 	// Two temp files with 2 and 3 LBAs written to them
 	// Allocate files and write to them
-	unique_ptr<FileHandle> test1_fh = file_system->OpenFile("nvmefs:///tmp/test1", flags);
-	unique_ptr<FileHandle> test2_fh = file_system->OpenFile("nvmefs:///tmp/test2", flags);
+	string tmp_file_path1 = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S32K", 0);
+	string tmp_file_path2 = StringUtil::Format("nvmefs:///tmp/duckdb_temp_storage_%s-%llu.tmp", "S64K", 0);
+	unique_ptr<FileHandle> test1_fh = file_system->OpenFile(tmp_file_path1, flags);
+	unique_ptr<FileHandle> test2_fh = file_system->OpenFile(tmp_file_path2, flags);
 	vector<char> test1_buf(3 * geo.lba_size);
 	vector<char> test2_buf(2 * geo.lba_size);
 	memset(test1_buf.data(), 1, 3 * geo.lba_size);
@@ -939,7 +951,7 @@ TEST_F(DiskInteractionTest, GetAvailableDiskSpaceTmpDirectoryWithTwoFilesReturnC
 	// check
 	// Cheating a bit - max_temp_size is private.
 	// The temp dir size for the tests is 640 LBAs
-	idx_t expected_size = (640 * geo.lba_size) - (3 * geo.lba_size) - (2 * geo.lba_size);
+	idx_t expected_size = (32000 * 4096 + 64000 * 4096) - (3 * geo.lba_size) - (2 * geo.lba_size);
 	optional_idx result_size = file_system->GetAvailableDiskSpace("nvmefs:///tmp");
 	ASSERT_TRUE(result_size.IsValid());
 	EXPECT_EQ(result_size.GetIndex(), expected_size);

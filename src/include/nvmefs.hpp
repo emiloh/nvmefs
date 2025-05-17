@@ -7,7 +7,7 @@
 #include "device.hpp"
 #include "nvme_device.hpp"
 #include "nvmefs_config.hpp"
-#include "nvmefs_temporary_block_manager.hpp"
+#include "temporary_file_metadata_manager.hpp"
 
 namespace duckdb {
 
@@ -93,9 +93,8 @@ public:
 	void Seek(FileHandle &handle, idx_t location) override;
 	void Reset(FileHandle &handle);
 	idx_t SeekPosition(FileHandle &handle) override;
-	bool ListFiles(const string &directory,
-		const std::function<void(const string &, bool)> &callback,
-		FileOpener *opener = nullptr);
+	bool ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
+	               FileOpener *opener = nullptr);
 	optional_idx GetAvailableDiskSpace(const string &path);
 	bool Trim(FileHandle &handle, idx_t offset_bytes, idx_t length_bytes) override;
 
@@ -126,8 +125,7 @@ private:
 	Allocator &allocator;
 	unique_ptr<GlobalMetadata> metadata;
 	unique_ptr<Device> device;
-	map<string, TemporaryFileMetadata> file_to_temp_meta;
-	unique_ptr<NvmeTemporaryBlockManager> temp_block_manager;
+	unique_ptr<TemporaryFileMetadataManager> temp_meta_manager;
 	atomic<idx_t> db_location;
 	atomic<idx_t> wal_location;
 	idx_t max_temp_size;

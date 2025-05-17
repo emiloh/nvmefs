@@ -35,6 +35,7 @@ NvmeTemporaryBlockManager::NvmeTemporaryBlockManager(idx_t allocated_lba_start, 
 	    vector<TemporaryBlock *>(8, nullptr); // There are 8 different allocation sizes for the TemporaryBufferSize
 
 	blocks_free[7] = blocks.get(); // The largest block is the first one
+	blocks->is_free = true;        // Mark the block as free
 }
 
 uint8_t NvmeTemporaryBlockManager::GetFreeListIndex(idx_t lba_amount) {
